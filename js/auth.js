@@ -6,7 +6,8 @@ import {
   signInWithEmailAndPassword, 
   signOut, 
   onAuthStateChanged,
-  sendPasswordResetEmail 
+  sendPasswordResetEmail,
+  createUserWithEmailAndPassword
 } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 import { 
   doc, 
@@ -38,6 +39,18 @@ export async function resetPassword(email) {
   try {
     await sendPasswordResetEmail(auth, email);
     return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+
+// Create a new user in Firebase Auth
+// Note: This will sign out the current admin user temporarily
+// We need to re-authenticate after creating the user
+export async function createAuthUser(email, password) {
+  try {
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    return { success: true, user: userCredential.user };
   } catch (error) {
     return { success: false, error: error.message };
   }
@@ -79,4 +92,9 @@ export function onAuthChange(callback) {
 // Get current user
 export function getCurrentUser() {
   return auth.currentUser;
+}
+
+// Get auth instance (for re-authentication)
+export function getAuthInstance() {
+  return auth;
 }

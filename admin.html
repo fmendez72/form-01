@@ -177,10 +177,16 @@
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
+          <div id="addUserError" class="alert alert-danger d-none"></div>
           <form id="addUserForm">
             <div class="mb-3">
               <label class="form-label">Email</label>
               <input type="email" class="form-control" id="newUserEmail" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Password</label>
+              <input type="password" class="form-control" id="newUserPassword" required minlength="6">
+              <div class="form-text">Minimum 6 characters</div>
             </div>
             <div class="mb-3">
               <label class="form-label">Role</label>
@@ -203,29 +209,83 @@
     </div>
   </div>
 
+  <!-- Edit User Modal -->
+  <div class="modal fade" id="editUserModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Edit User</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <form id="editUserForm">
+            <div class="mb-3">
+              <label class="form-label">Email</label>
+              <input type="email" class="form-control" id="editUserEmail" readonly>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Role</label>
+              <select class="form-select" id="editUserRole">
+                <option value="coder">Coder (Research Assistant)</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Assigned Jobs (comma-separated)</label>
+              <input type="text" class="form-control" id="editUserJobs">
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Status</label>
+              <select class="form-select" id="editUserStatus">
+                <option value="active">Active</option>
+                <option value="disabled">Disabled</option>
+              </select>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-danger me-auto" id="deleteUserBtn">Delete User</button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-primary" id="updateUserBtn">Save Changes</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Upload Users CSV Modal -->
   <div class="modal fade" id="uploadUsersModal" tabindex="-1">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-lg">
       <div class="modal-content">
         <div class="modal-header">
           <h5 class="modal-title">Upload Users CSV</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
-          <p class="text-muted">CSV format: email,role,assigned_jobs</p>
-          <p class="text-muted small">Example: john@example.com,coder,"referendum-2024|initiative-2024"</p>
+          <div class="alert alert-info">
+            <strong>CSV Format:</strong> user_email, password, assigned_jobs, role<br>
+            <small>Example: <code>john@example.com,Password123!,"ref-1,agenda-1",coder</code></small>
+          </div>
+          <div class="alert alert-warning">
+            <strong>Note:</strong> This will create Firebase Auth accounts for each user. Passwords must be at least 6 characters.
+          </div>
           <div class="file-upload-zone" id="usersDropZone">
             <input type="file" id="usersFileInput" accept=".csv" style="display: none">
             <p class="mb-0">📁 Click or drag CSV file here</p>
           </div>
           <div id="usersPreview" class="mt-3 d-none">
             <h6>Preview:</h6>
-            <div id="usersPreviewContent"></div>
+            <div id="usersPreviewContent" style="max-height: 200px; overflow-y: auto;"></div>
+          </div>
+          <div id="uploadProgress" class="mt-3 d-none">
+            <div class="progress">
+              <div id="uploadProgressBar" class="progress-bar" role="progressbar" style="width: 0%"></div>
+            </div>
+            <div id="uploadStatus" class="small text-muted mt-2"></div>
           </div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="button" class="btn btn-primary d-none" id="confirmUsersUpload">Upload Users</button>
+          <button type="button" class="btn btn-primary d-none" id="confirmUsersUpload">Create Users</button>
         </div>
       </div>
     </div>
@@ -281,6 +341,25 @@
     </div>
   </div>
 
+  <!-- View Template Modal -->
+  <div class="modal fade" id="viewTemplateModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Template Details</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div id="templateDetail"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-danger me-auto" id="deleteTemplateBtn">Delete Template</button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- View Response Modal -->
   <div class="modal fade" id="viewResponseModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
@@ -306,21 +385,27 @@
   
   <!-- Admin App Script -->
   <script type="module">
-    import { signIn, logOut, onAuthChange, getUserRole } from './js/auth.js';
+    import { signIn, logOut, onAuthChange, getUserRole, createAuthUser, getAuthInstance } from './js/auth.js';
     import { 
-      createUser, getAllUsers, updateUser, createUsersFromCSV,
-      createTemplate, getTemplate, getAllTemplates,
+      signInWithEmailAndPassword 
+    } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+    import { 
+      createUser, getAllUsers, updateUser, deleteUser, createUsersFromCSV,
+      createTemplate, getTemplate, getAllTemplates, deleteTemplate,
       getAllResponses, getJobResponses, responsesToCSV
     } from './js/firestore-service.js';
     import { parseCSV, createTemplateSchema, validateTemplateSchema, getExampleCSV } from './js/template-parser.js';
 
     // State
     let currentUser = null;
+    let currentAdminCredentials = null; // Store admin credentials for re-auth
     let allUsers = [];
     let allTemplates = [];
     let allResponses = [];
     let parsedUsersCSV = null;
     let parsedTemplateCSV = null;
+    let currentEditingUser = null;
+    let currentViewingTemplate = null;
 
     // DOM Elements
     const signInSection = document.getElementById('signInSection');
@@ -351,6 +436,9 @@
       const email = document.getElementById('email').value;
       const password = document.getElementById('password').value;
       
+      // Store credentials for re-authentication after creating users
+      currentAdminCredentials = { email, password };
+      
       const result = await signIn(email, password);
       if (!result.success) {
         signInError.textContent = result.error;
@@ -360,6 +448,7 @@
 
     // Logout
     document.getElementById('logoutBtn').addEventListener('click', async () => {
+      currentAdminCredentials = null;
       await logOut();
     });
 
@@ -424,6 +513,11 @@
           </tr>
         `).join('');
         
+        // Add edit click handlers
+        document.querySelectorAll('.edit-user-btn').forEach(btn => {
+          btn.addEventListener('click', () => openEditUserModal(btn.dataset.email));
+        });
+        
       } catch (error) {
         console.error('Error loading users:', error);
         tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger">Error loading users</td></tr>';
@@ -432,29 +526,139 @@
 
     // Add user modal
     document.getElementById('addUserBtn').addEventListener('click', () => {
+      document.getElementById('addUserForm').reset();
+      document.getElementById('addUserError').classList.add('d-none');
       new bootstrap.Modal(document.getElementById('addUserModal')).show();
     });
 
-    // Save new user
+    // Save new user (creates both Auth and Firestore records)
     document.getElementById('saveUserBtn').addEventListener('click', async () => {
-      const email = document.getElementById('newUserEmail').value;
+      const email = document.getElementById('newUserEmail').value.trim();
+      const password = document.getElementById('newUserPassword').value;
       const role = document.getElementById('newUserRole').value;
       const jobsStr = document.getElementById('newUserJobs').value;
-      const assignedJobs = jobsStr ? jobsStr.split(',').map(j => j.trim()) : [];
+      const assignedJobs = jobsStr ? jobsStr.split(',').map(j => j.trim()).filter(j => j) : [];
+      
+      if (!email || !password) {
+        showAddUserError('Email and password are required');
+        return;
+      }
+      
+      if (password.length < 6) {
+        showAddUserError('Password must be at least 6 characters');
+        return;
+      }
+      
+      const saveBtn = document.getElementById('saveUserBtn');
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Creating...';
       
       try {
+        // Create user in Firebase Auth
+        const authResult = await createAuthUser(email, password);
+        if (!authResult.success) {
+          throw new Error(authResult.error);
+        }
+        
+        // Re-authenticate as admin (creating user signs us out)
+        if (currentAdminCredentials) {
+          await signInWithEmailAndPassword(
+            getAuthInstance(), 
+            currentAdminCredentials.email, 
+            currentAdminCredentials.password
+          );
+        }
+        
+        // Create user in Firestore
         await createUser(email, { role, assignedJobs });
+        
         bootstrap.Modal.getInstance(document.getElementById('addUserModal')).hide();
         document.getElementById('addUserForm').reset();
         loadUsers();
         alert('User created successfully!');
       } catch (error) {
-        alert('Error creating user: ' + error.message);
+        showAddUserError(error.message);
+        // Try to re-authenticate admin if we got signed out
+        if (currentAdminCredentials) {
+          try {
+            await signInWithEmailAndPassword(
+              getAuthInstance(), 
+              currentAdminCredentials.email, 
+              currentAdminCredentials.password
+            );
+          } catch (e) {
+            console.error('Re-auth failed:', e);
+          }
+        }
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Create User';
       }
     });
 
-    // Upload users CSV
+    function showAddUserError(message) {
+      const errorEl = document.getElementById('addUserError');
+      errorEl.textContent = message;
+      errorEl.classList.remove('d-none');
+    }
+
+    // Edit user modal
+    function openEditUserModal(email) {
+      const user = allUsers.find(u => u.email === email);
+      if (!user) return;
+      
+      currentEditingUser = user;
+      document.getElementById('editUserEmail').value = user.email;
+      document.getElementById('editUserRole').value = user.role || 'coder';
+      document.getElementById('editUserJobs').value = (user.assignedJobs || []).join(', ');
+      document.getElementById('editUserStatus').value = user.status || 'active';
+      
+      new bootstrap.Modal(document.getElementById('editUserModal')).show();
+    }
+
+    // Update user
+    document.getElementById('updateUserBtn').addEventListener('click', async () => {
+      if (!currentEditingUser) return;
+      
+      const role = document.getElementById('editUserRole').value;
+      const jobsStr = document.getElementById('editUserJobs').value;
+      const assignedJobs = jobsStr ? jobsStr.split(',').map(j => j.trim()).filter(j => j) : [];
+      const status = document.getElementById('editUserStatus').value;
+      
+      try {
+        await updateUser(currentEditingUser.email, { role, assignedJobs, status });
+        bootstrap.Modal.getInstance(document.getElementById('editUserModal')).hide();
+        loadUsers();
+        alert('User updated successfully!');
+      } catch (error) {
+        alert('Error updating user: ' + error.message);
+      }
+    });
+
+    // Delete user
+    document.getElementById('deleteUserBtn').addEventListener('click', async () => {
+      if (!currentEditingUser) return;
+      
+      if (!confirm(`Delete user ${currentEditingUser.email}? This only removes them from Firestore, not Firebase Auth.`)) {
+        return;
+      }
+      
+      try {
+        await deleteUser(currentEditingUser.email);
+        bootstrap.Modal.getInstance(document.getElementById('editUserModal')).hide();
+        loadUsers();
+        alert('User deleted from Firestore. Note: Firebase Auth account still exists.');
+      } catch (error) {
+        alert('Error deleting user: ' + error.message);
+      }
+    });
+
+    // Upload users CSV modal
     document.getElementById('uploadUsersBtn').addEventListener('click', () => {
+      parsedUsersCSV = null;
+      document.getElementById('usersPreview').classList.add('d-none');
+      document.getElementById('confirmUsersUpload').classList.add('d-none');
+      document.getElementById('uploadProgress').classList.add('d-none');
       new bootstrap.Modal(document.getElementById('uploadUsersModal')).show();
     });
 
@@ -484,15 +688,44 @@
       
       Papa.parse(file, {
         header: true,
+        skipEmptyLines: true,
         complete: (results) => {
-          parsedUsersCSV = results.data.filter(row => row.email);
+          // Normalize column names
+          parsedUsersCSV = results.data.map(row => {
+            const email = row.user_email || row.email || '';
+            const password = row.password || '';
+            const role = row.role || 'coder';
+            const jobsStr = row.assigned_jobs || row.assignedJobs || '';
+            const assignedJobs = jobsStr ? jobsStr.split(',').map(j => j.trim()).filter(j => j) : [];
+            
+            return { email, password, role, assignedJobs };
+          }).filter(u => u.email && u.password);
           
           const preview = document.getElementById('usersPreview');
           const content = document.getElementById('usersPreviewContent');
           
-          content.innerHTML = `<p>${parsedUsersCSV.length} users found</p>
-            <ul class="small">${parsedUsersCSV.slice(0, 5).map(u => `<li>${u.email} (${u.role || 'coder'})</li>`).join('')}</ul>
-            ${parsedUsersCSV.length > 5 ? '<p class="small text-muted">...and more</p>' : ''}`;
+          if (parsedUsersCSV.length === 0) {
+            content.innerHTML = '<p class="text-danger">No valid users found. Check CSV format.</p>';
+            preview.classList.remove('d-none');
+            return;
+          }
+          
+          content.innerHTML = `
+            <table class="table table-sm">
+              <thead><tr><th>Email</th><th>Password</th><th>Role</th><th>Jobs</th></tr></thead>
+              <tbody>
+                ${parsedUsersCSV.map(u => `
+                  <tr>
+                    <td>${u.email}</td>
+                    <td>${'•'.repeat(u.password.length)}</td>
+                    <td>${u.role}</td>
+                    <td>${u.assignedJobs.join(', ') || '-'}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+            <p class="small text-muted">${parsedUsersCSV.length} users to create</p>
+          `;
           
           preview.classList.remove('d-none');
           document.getElementById('confirmUsersUpload').classList.remove('d-none');
@@ -503,23 +736,78 @@
       });
     }
 
+    // Confirm users upload - creates Auth accounts one by one
     document.getElementById('confirmUsersUpload').addEventListener('click', async () => {
-      if (!parsedUsersCSV) return;
+      if (!parsedUsersCSV || parsedUsersCSV.length === 0) return;
       
-      const usersData = parsedUsersCSV.map(row => ({
-        email: row.email,
-        role: row.role || 'coder',
-        assignedJobs: row.assigned_jobs ? row.assigned_jobs.split('|').map(j => j.trim()) : []
-      }));
+      const confirmBtn = document.getElementById('confirmUsersUpload');
+      confirmBtn.disabled = true;
       
-      try {
-        const result = await createUsersFromCSV(usersData);
-        bootstrap.Modal.getInstance(document.getElementById('uploadUsersModal')).hide();
-        loadUsers();
-        alert(`Created ${result.created} users!`);
-      } catch (error) {
-        alert('Error uploading users: ' + error.message);
+      const progressEl = document.getElementById('uploadProgress');
+      const progressBar = document.getElementById('uploadProgressBar');
+      const statusEl = document.getElementById('uploadStatus');
+      progressEl.classList.remove('d-none');
+      
+      const results = { success: [], failed: [] };
+      
+      for (let i = 0; i < parsedUsersCSV.length; i++) {
+        const user = parsedUsersCSV[i];
+        const progress = Math.round(((i + 1) / parsedUsersCSV.length) * 100);
+        progressBar.style.width = `${progress}%`;
+        statusEl.textContent = `Creating ${user.email}... (${i + 1}/${parsedUsersCSV.length})`;
+        
+        try {
+          // Create in Firebase Auth
+          const authResult = await createAuthUser(user.email, user.password);
+          if (!authResult.success) {
+            throw new Error(authResult.error);
+          }
+          
+          // Re-authenticate as admin
+          if (currentAdminCredentials) {
+            await signInWithEmailAndPassword(
+              getAuthInstance(), 
+              currentAdminCredentials.email, 
+              currentAdminCredentials.password
+            );
+          }
+          
+          // Create in Firestore
+          await createUser(user.email, { 
+            role: user.role, 
+            assignedJobs: user.assignedJobs 
+          });
+          
+          results.success.push(user.email);
+        } catch (error) {
+          results.failed.push({ email: user.email, error: error.message });
+          
+          // Re-authenticate admin if needed
+          if (currentAdminCredentials) {
+            try {
+              await signInWithEmailAndPassword(
+                getAuthInstance(), 
+                currentAdminCredentials.email, 
+                currentAdminCredentials.password
+              );
+            } catch (e) {
+              console.error('Re-auth failed:', e);
+            }
+          }
+        }
       }
+      
+      // Show results
+      let message = `Created ${results.success.length} users successfully.`;
+      if (results.failed.length > 0) {
+        message += `\n\nFailed (${results.failed.length}):\n` + 
+          results.failed.map(f => `${f.email}: ${f.error}`).join('\n');
+      }
+      alert(message);
+      
+      bootstrap.Modal.getInstance(document.getElementById('uploadUsersModal')).hide();
+      confirmBtn.disabled = false;
+      loadUsers();
     });
 
     // ============================================================
@@ -544,12 +832,17 @@
             <td>${template.title}</td>
             <td>${template.fields?.length || 0}</td>
             <td>v${template.version || 1}</td>
-            <td><span class="badge bg-${template.status === 'active' ? 'success' : 'secondary'}">${template.status}</span></td>
+            <td><span class="badge bg-${template.status === 'active' ? 'success' : 'secondary'}">${template.status || 'active'}</span></td>
             <td>
               <button class="btn btn-sm btn-outline-secondary view-template-btn" data-job-id="${template.jobId}">View</button>
             </td>
           </tr>
         `).join('');
+        
+        // Add view click handlers
+        document.querySelectorAll('.view-template-btn').forEach(btn => {
+          btn.addEventListener('click', () => viewTemplate(btn.dataset.jobId));
+        });
         
         // Update job filter in responses section
         const filterJob = document.getElementById('filterJob');
@@ -562,8 +855,88 @@
       }
     }
 
+    // View template
+    function viewTemplate(jobId) {
+      const template = allTemplates.find(t => t.jobId === jobId);
+      if (!template) return;
+      
+      currentViewingTemplate = template;
+      
+      const detail = document.getElementById('templateDetail');
+      detail.innerHTML = `
+        <div class="row mb-3">
+          <div class="col-md-6">
+            <strong>Job ID:</strong> <code>${template.jobId}</code>
+          </div>
+          <div class="col-md-6">
+            <strong>Version:</strong> ${template.version || 1}
+          </div>
+        </div>
+        <div class="row mb-3">
+          <div class="col-md-6">
+            <strong>Title:</strong> ${template.title}
+          </div>
+          <div class="col-md-6">
+            <strong>Status:</strong> <span class="badge bg-${template.status === 'active' ? 'success' : 'secondary'}">${template.status || 'active'}</span>
+          </div>
+        </div>
+        <div class="mb-3">
+          <strong>Description:</strong> ${template.description || '<em class="text-muted">No description</em>'}
+        </div>
+        <div class="mb-3">
+          <strong>Help Display:</strong> ${template.helpDisplay || 'tooltip'}
+        </div>
+        <hr>
+        <h6>Fields (${template.fields?.length || 0})</h6>
+        <div style="max-height: 300px; overflow-y: auto;">
+          <table class="table table-sm">
+            <thead>
+              <tr><th>ID</th><th>Type</th><th>Label</th><th>Required</th><th>Options</th></tr>
+            </thead>
+            <tbody>
+              ${(template.fields || []).map(f => `
+                <tr>
+                  <td><code>${f.id}</code></td>
+                  <td>${f.type}</td>
+                  <td>${f.label.substring(0, 40)}${f.label.length > 40 ? '...' : ''}</td>
+                  <td>${f.required ? '✓' : ''}</td>
+                  <td>${(f.options || []).join(', ') || '-'}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+      
+      new bootstrap.Modal(document.getElementById('viewTemplateModal')).show();
+    }
+
+    // Delete template
+    document.getElementById('deleteTemplateBtn').addEventListener('click', async () => {
+      if (!currentViewingTemplate) return;
+      
+      if (!confirm(`Delete template "${currentViewingTemplate.title}"? This cannot be undone.`)) {
+        return;
+      }
+      
+      try {
+        await deleteTemplate(currentViewingTemplate.jobId);
+        bootstrap.Modal.getInstance(document.getElementById('viewTemplateModal')).hide();
+        loadTemplates();
+        alert('Template deleted!');
+      } catch (error) {
+        alert('Error deleting template: ' + error.message);
+      }
+    });
+
     // Upload template
     document.getElementById('uploadTemplateBtn').addEventListener('click', () => {
+      parsedTemplateCSV = null;
+      document.getElementById('templateJobId').value = '';
+      document.getElementById('templateTitle').value = '';
+      document.getElementById('templateDescription').value = '';
+      document.getElementById('templatePreview').classList.add('d-none');
+      document.getElementById('confirmTemplateUpload').classList.add('d-none');
       new bootstrap.Modal(document.getElementById('uploadTemplateModal')).show();
     });
 
@@ -665,46 +1038,50 @@
       
       try {
         allResponses = await getAllResponses();
-        
-        // Apply filters
-        const jobFilter = document.getElementById('filterJob').value;
-        const statusFilter = document.getElementById('filterStatus').value;
-        
-        let filtered = allResponses;
-        if (jobFilter) filtered = filtered.filter(r => r.jobId === jobFilter);
-        if (statusFilter) filtered = filtered.filter(r => r.status === statusFilter);
-        
-        if (filtered.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No responses found</td></tr>';
-          return;
-        }
-        
-        tbody.innerHTML = filtered.map(response => `
-          <tr>
-            <td>${response.userEmail}</td>
-            <td><code>${response.jobId}</code></td>
-            <td><span class="badge badge-${response.status}">${response.status}</span></td>
-            <td>${formatDate(response.updatedAt)}</td>
-            <td>
-              <button class="btn btn-sm btn-outline-secondary view-response-btn" data-response-id="${response.responseId}">View</button>
-            </td>
-          </tr>
-        `).join('');
-        
-        // Add click handlers
-        document.querySelectorAll('.view-response-btn').forEach(btn => {
-          btn.addEventListener('click', () => viewResponse(btn.dataset.responseId));
-        });
-        
+        renderResponses();
       } catch (error) {
         console.error('Error loading responses:', error);
         tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger">Error loading responses</td></tr>';
       }
     }
 
+    function renderResponses() {
+      const tbody = document.getElementById('responsesTableBody');
+      
+      // Apply filters
+      const jobFilter = document.getElementById('filterJob').value;
+      const statusFilter = document.getElementById('filterStatus').value;
+      
+      let filtered = allResponses;
+      if (jobFilter) filtered = filtered.filter(r => r.jobId === jobFilter);
+      if (statusFilter) filtered = filtered.filter(r => r.status === statusFilter);
+      
+      if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No responses found</td></tr>';
+        return;
+      }
+      
+      tbody.innerHTML = filtered.map(response => `
+        <tr>
+          <td>${response.userEmail}</td>
+          <td><code>${response.jobId}</code></td>
+          <td><span class="badge badge-${response.status}">${response.status}</span></td>
+          <td>${formatDate(response.updatedAt)}</td>
+          <td>
+            <button class="btn btn-sm btn-outline-secondary view-response-btn" data-response-id="${response.responseId}">View</button>
+          </td>
+        </tr>
+      `).join('');
+      
+      // Add click handlers
+      document.querySelectorAll('.view-response-btn').forEach(btn => {
+        btn.addEventListener('click', () => viewResponse(btn.dataset.responseId));
+      });
+    }
+
     // Filters
-    document.getElementById('filterJob').addEventListener('change', loadResponses);
-    document.getElementById('filterStatus').addEventListener('change', loadResponses);
+    document.getElementById('filterJob').addEventListener('change', renderResponses);
+    document.getElementById('filterStatus').addEventListener('change', renderResponses);
 
     // View response
     async function viewResponse(responseId) {
@@ -715,7 +1092,7 @@
       
       const detail = document.getElementById('responseDetail');
       detail.innerHTML = `
-        <p><strong>Response ID:</strong> ${response.responseId}</p>
+        <p><strong>Response ID:</strong> <code>${response.responseId}</code></p>
         <p><strong>User:</strong> ${response.userEmail}</p>
         <p><strong>Job:</strong> ${response.jobId}</p>
         <p><strong>Status:</strong> <span class="badge badge-${response.status}">${response.status}</span></p>

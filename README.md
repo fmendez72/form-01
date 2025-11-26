@@ -6,6 +6,7 @@ A serverless web application for systematic collection of political science rese
 
 - **Flexible Questionnaires**: CSV-defined templates with multiple field types (dropdown, text, textarea, radio, number, date)
 - **Role-Based Access**: Admin and Coder roles with appropriate permissions
+- **User Management**: Create users manually or via CSV upload (with passwords)
 - **Auto-Save Drafts**: Automatic draft saving every 30 seconds
 - **Progress Tracking**: Visual completion indicators
 - **CSV Export**: Export submitted responses for analysis
@@ -23,7 +24,7 @@ A serverless web application for systematic collection of political science rese
 
 ```
 form-01/
-├── index.qmd           # Quarto landing page source
+├── index.html          # Landing page
 ├── signin.html         # Coder sign-in and dashboard
 ├── admin.html          # Admin panel
 ├── css/
@@ -36,8 +37,11 @@ form-01/
 │   └── form-renderer.js      # Handsontable configuration
 ├── templates/
 │   └── referendum-example.csv  # Example template
+├── users/
+│   └── users.csv             # Example users CSV
 ├── firestore.rules     # Firestore security rules
-└── README.md
+├── README.md
+└── CLAUDE.md
 ```
 
 ## Setup Instructions
@@ -51,26 +55,22 @@ form-01/
 
 ### 2. Create Initial Admin User
 
-In Firebase Console > Authentication:
-1. Add a user with email/password
-2. In Firestore, create document in `users` collection:
+**Option A: Via Firebase Console**
+1. Authentication > Add user (email/password)
+2. Firestore > users collection > Add document:
    - Document ID: user's email
    - Fields: `{ email: "...", role: "admin", assignedJobs: [], status: "active" }`
+
+**Option B: Via Admin Panel (after first admin exists)**
+1. Sign in as admin
+2. Users > Add User
+3. Enter email, password, select "Admin" role
 
 ### 3. Deploy to GitHub Pages
 
 1. Push to GitHub repository
 2. Enable GitHub Pages in Settings > Pages
 3. Set source to main branch
-4. Render Quarto landing page: `quarto render index.qmd`
-
-### 4. Configure Firebase Hosting (Optional)
-
-If using Firebase Hosting instead of GitHub Pages:
-```bash
-firebase init hosting
-firebase deploy --only hosting
-```
 
 ## Usage
 
@@ -78,7 +78,11 @@ firebase deploy --only hosting
 
 1. Go to `admin.html`
 2. Sign in with admin credentials
-3. **Users**: Create coders via form or CSV upload
+3. **Users**: 
+   - Add single user with email/password
+   - Upload CSV for bulk user creation
+   - Edit user roles, jobs, status
+   - Delete users
 4. **Templates**: Upload CSV template to create questionnaires
 5. **Responses**: View, filter, and export submitted responses
 
@@ -90,12 +94,28 @@ firebase deploy --only hosting
 4. Complete the questionnaire
 5. Save draft or submit final response
 
-## Template CSV Format
+## CSV Formats
+
+### Users CSV
+
+```csv
+user_email,password,assigned_jobs,role
+admin@example.com,Admin123!,"ref-1,agenda-1",admin
+coder1@example.com,Coder123!,ref-1,coder
+coder2@example.com,Coder456!,"ref-1,agenda-1",coder
+```
+
+**Notes:**
+- Passwords must be at least 6 characters
+- Multiple jobs separated by commas within quotes
+- Role: `admin` or `coder`
+
+### Template CSV
 
 ```csv
 field_id,field_type,label,help_text,required,options,default_value,skip_to_if_no
-q1,dropdown,Question text,Help text,yes,Option1|Option2|Option3,,
-q2,radio,Yes/No question,Explanation,yes,Yes|No,,
+q1,dropdown,Is there a referendum?,Definition...,yes,Yes|No|Unknown,,
+q2,radio,Legal basis?,Is there explicit law?,yes,Yes|No,,
 q3,text,Text input,Instructions,no,,,
 q4,textarea,Long answer,Details,no,,,
 q5,number,Numeric value,Format info,yes,,,
@@ -110,14 +130,12 @@ q6,date,Date field,Date format,no,,,
 - `number`: Numeric input
 - `date`: Date picker
 
-## Users CSV Format
+## Security Notes
 
-```csv
-email,role,assigned_jobs
-coder1@example.com,coder,referendum-2024|initiative-2024
-coder2@example.com,coder,referendum-2024
-admin@example.com,admin,
-```
+- User deletion from admin panel only removes Firestore document
+- Firebase Auth account must be deleted separately in Firebase Console
+- Firestore security rules enforce role-based access
+- Submitted responses cannot be edited by coders
 
 ## License
 

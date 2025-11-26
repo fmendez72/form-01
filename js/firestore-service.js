@@ -46,7 +46,15 @@ export async function getAllUsers() {
 
 export async function updateUser(email, updates) {
   const userRef = doc(db, 'users', email);
-  await updateDoc(userRef, updates);
+  await updateDoc(userRef, {
+    ...updates,
+    updatedAt: serverTimestamp()
+  });
+}
+
+export async function deleteUser(email) {
+  const userRef = doc(db, 'users', email);
+  await deleteDoc(userRef);
 }
 
 export async function assignJobToUser(email, jobId) {
@@ -106,6 +114,13 @@ export async function getTemplate(jobId) {
 
 export async function getAllTemplates() {
   const templatesRef = collection(db, 'templates');
+  const snapshot = await getDocs(templatesRef);
+  // Return all templates, not just active ones
+  return snapshot.docs.map(doc => ({ jobId: doc.id, ...doc.data() }));
+}
+
+export async function getActiveTemplates() {
+  const templatesRef = collection(db, 'templates');
   const q = query(templatesRef, where('status', '==', 'active'));
   const snapshot = await getDocs(q);
   return snapshot.docs.map(doc => ({ jobId: doc.id, ...doc.data() }));
@@ -117,6 +132,11 @@ export async function updateTemplate(jobId, updates) {
     ...updates,
     updatedAt: serverTimestamp()
   });
+}
+
+export async function deleteTemplate(jobId) {
+  const templateRef = doc(db, 'templates', jobId);
+  await deleteDoc(templateRef);
 }
 
 export async function archiveTemplate(jobId) {
