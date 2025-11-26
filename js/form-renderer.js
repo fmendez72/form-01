@@ -2,6 +2,7 @@
 // Dynamic form renderer using Handsontable
 
 let hotInstance = null;
+let collapsedGroups = new Set(); // Track which groups are collapsed
 
 // Initialize Handsontable with template schema
 export function initializeForm(containerId, template, responseData, options = {}) {
@@ -40,19 +41,58 @@ export function initializeForm(containerId, template, responseData, options = {}
     manualColumnResize: true,
     contextMenu: false,
     readOnly: readOnly,
+    hiddenRows: {
+      rows: [],
+      indicators: false
+    },
     cells: function(row, col, prop) {
       const cellProperties = {};
-      // Make label and help columns read-only
-      if (prop === 'label' || prop === 'help') {
-        cellProperties.readOnly = true;
-        cellProperties.className = 'htDimmed';
+      const rowData = this.instance.getSourceDataAtRow(row);
+
+      // Check if row should be hidden
+      if (isRowHidden(this.instance, row)) {
+        cellProperties.className = 'hidden-row';
       }
+
+      // Check if this is a group header row
+      const isGroupHeader = rowData?.fieldId && rowData.fieldId.endsWith('_header');
+      if (isGroupHeader) {
+        cellProperties.readOnly = true;
+        if (col > 0) {
+          // Hide all columns after the first for header rows
+          cellProperties.className = 'htDimmed group-header-hidden-cell';
+        }
+      } else {
+        // Make label and help columns read-only for regular rows
+        if (prop === 'label' || prop === 'help') {
+          cellProperties.readOnly = true;
+          cellProperties.className = 'htDimmed';
+        }
+      }
+
       return cellProperties;
     },
     afterChange: function(changes, source) {
       if (source !== 'loadData' && onDataChange) {
         const currentData = extractResponseData(template.fields);
         onDataChange(currentData);
+      }
+    },
+    beforeRenderer: function(TD, row, col, prop, value, cellProperties) {
+      // Hide rows that belong to collapsed groups
+      const rowData = this.getSourceDataAtRow(row);
+      if (rowData && rowData.group && !rowData.fieldId.endsWith('_header')) {
+        if (collapsedGroups.has(rowData.group)) {
+          TD.parentElement.style.display = 'none';
+        } else {
+          TD.parentElement.style.display = '';
+        }
+      }
+
+      // Hide additional cells in group header rows
+      const isGroupHeader = rowData?.fieldId && rowData.fieldId.endsWith('_header');
+      if (isGroupHeader && col > 0) {
+        TD.style.display = 'none';
       }
     }
   });
@@ -93,7 +133,8 @@ function buildColumns(template, helpDisplay, readOnly) {
   columns.push({
     data: 'note',
     width: 150,
-    type: 'text'
+    type: 'text',
+    renderer: notesRenderer
   });
 
   return columns;
@@ -127,44 +168,101 @@ function buildDataArray(fields, responseData = {}) {
 // Custom renderer for label column (with tooltip help)
 function labelRenderer(instance, td, row, col, prop, value, cellProperties) {
   Handsontable.renderers.TextRenderer.apply(this, arguments);
-  
+
   const rowData = instance.getSourceDataAtRow(row);
   td.innerHTML = '';
-  
-  // Create label text
-  const labelSpan = document.createElement('span');
-  labelSpan.textContent = value;
-  if (rowData.required) {
-    labelSpan.innerHTML += ' <span class="text-danger">*</span>';
-  }
-  td.appendChild(labelSpan);
-  
-  // Add help icon if help text exists and not using column display
-  const template = window.currentTemplate;
-  if (rowData.help && template?.helpDisplay !== 'column') {
-    const helpIcon = document.createElement('span');
-    helpIcon.className = 'help-icon ms-2';
-    helpIcon.innerHTML = 'ⓘ';
-    helpIcon.title = rowData.help;
-    helpIcon.style.cursor = 'pointer';
-    helpIcon.style.color = '#6c757d';
-    
-    // Toggle tooltip on click
-    helpIcon.onclick = (e) => {
-      e.stopPropagation();
-      showHelpTooltip(helpIcon, rowData.help);
+
+  // Check if this is a group header row
+  const isGroupHeader = rowData.fieldId && rowData.fieldId.endsWith('_header');
+
+  if (isGroupHeader) {
+    // Render as collapsible section header
+    const groupName = rowData.group || rowData.fieldId;
+    const isCollapsed = collapsedGroups.has(groupName);
+
+    const headerDiv = document.createElement('div');
+    headerDiv.className = 'group-header';
+    headerDiv.style.cssText = `
+      font-weight: bold;
+      font-size: 1.1em;
+      padding: 12px 8px;
+      background: #f8f9fa;
+      border-left: 4px solid #0d6efd;
+      cursor: pointer;
+      user-select: none;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    `;
+
+    // Toggle icon
+    const icon = document.createElement('span');
+    icon.textContent = isCollapsed ? '▶' : '▼';
+    icon.style.transition = 'transform 0.2s';
+    headerDiv.appendChild(icon);
+
+    // Label text (remove any existing arrow icons from the label)
+    const labelText = document.createElement('span');
+    labelText.textContent = value.replace(/^[▼▶]\s*/, '');
+    headerDiv.appendChild(labelText);
+
+    // Click handler to toggle collapse
+    headerDiv.onclick = () => {
+      toggleGroupCollapse(instance, groupName);
     };
-    
-    td.appendChild(helpIcon);
+
+    td.appendChild(headerDiv);
+    td.colSpan = instance.countCols(); // Span across all columns
+    td.style.padding = '0';
+
+    // Make other cells in this row invisible
+    cellProperties.className = 'group-header-cell';
+  } else {
+    // Regular field row
+    const labelSpan = document.createElement('span');
+    labelSpan.textContent = value;
+    if (rowData.required) {
+      labelSpan.innerHTML += ' <span class="text-danger">*</span>';
+    }
+    td.appendChild(labelSpan);
+
+    // Add help icon if help text exists and not using column display
+    const template = window.currentTemplate;
+    if (rowData.help && template?.helpDisplay !== 'column') {
+      const helpIcon = document.createElement('span');
+      helpIcon.className = 'help-icon ms-2';
+      helpIcon.innerHTML = 'ⓘ';
+      helpIcon.title = rowData.help;
+      helpIcon.style.cursor = 'pointer';
+      helpIcon.style.color = '#6c757d';
+
+      // Toggle tooltip on click
+      helpIcon.onclick = (e) => {
+        e.stopPropagation();
+        showHelpTooltip(helpIcon, rowData.help);
+      };
+
+      td.appendChild(helpIcon);
+    }
+
+    td.style.whiteSpace = 'normal';
+    td.style.verticalAlign = 'top';
+    td.style.padding = '8px';
   }
-  
-  td.style.whiteSpace = 'normal';
-  td.style.verticalAlign = 'top';
-  td.style.padding = '8px';
 }
 
 // Custom renderer for help column
 function helpColumnRenderer(instance, td, row, col, prop, value, cellProperties) {
+  const rowData = instance.getSourceDataAtRow(row);
+  const isGroupHeader = rowData?.fieldId && rowData.fieldId.endsWith('_header');
+
+  if (isGroupHeader) {
+    // Hide help column for group headers
+    td.innerHTML = '';
+    td.style.display = 'none';
+    return;
+  }
+
   td.innerHTML = '';
   td.style.whiteSpace = 'normal';
   td.style.fontSize = '0.85em';
@@ -177,10 +275,18 @@ function helpColumnRenderer(instance, td, row, col, prop, value, cellProperties)
 function answerRenderer(instance, td, row, col, prop, value, cellProperties) {
   td.innerHTML = '';
   td.style.padding = '4px';
-  
+
   const rowData = instance.getSourceDataAtRow(row);
   const isReadOnly = instance.getSettings().readOnly;
-  
+
+  // Check if this is a group header row
+  const isGroupHeader = rowData.fieldId && rowData.fieldId.endsWith('_header');
+  if (isGroupHeader) {
+    // No answer input for group headers
+    td.style.display = 'none';
+    return;
+  }
+
   let input;
   
   switch (rowData.type) {
@@ -336,6 +442,47 @@ function answerRenderer(instance, td, row, col, prop, value, cellProperties) {
   }
   
   td.appendChild(input);
+}
+
+// Custom renderer for notes column
+function notesRenderer(instance, td, row, col, prop, value, cellProperties) {
+  const rowData = instance.getSourceDataAtRow(row);
+  const isGroupHeader = rowData?.fieldId && rowData.fieldId.endsWith('_header');
+
+  if (isGroupHeader) {
+    // Hide notes column for group headers
+    td.innerHTML = '';
+    td.style.display = 'none';
+    return;
+  }
+
+  // Default text renderer for regular rows
+  Handsontable.renderers.TextRenderer.apply(this, arguments);
+}
+
+// Toggle group collapse/expand
+function toggleGroupCollapse(instance, groupName) {
+  if (collapsedGroups.has(groupName)) {
+    collapsedGroups.delete(groupName);
+  } else {
+    collapsedGroups.add(groupName);
+  }
+  // Re-render the table
+  instance.render();
+}
+
+// Check if a row should be hidden based on group collapse state
+function isRowHidden(instance, row) {
+  const rowData = instance.getSourceDataAtRow(row);
+  if (!rowData || !rowData.group) return false;
+
+  // Don't hide the header row itself
+  if (rowData.fieldId && rowData.fieldId.endsWith('_header')) {
+    return false;
+  }
+
+  // Hide if the group is collapsed
+  return collapsedGroups.has(rowData.group);
 }
 
 // Show help tooltip

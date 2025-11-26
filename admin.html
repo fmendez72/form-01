@@ -406,6 +406,7 @@
     let parsedTemplateCSV = null;
     let currentEditingUser = null;
     let currentViewingTemplate = null;
+    let isCreatingUser = false; // Flag to suppress auth warnings during user creation
 
     // DOM Elements
     const signInSection = document.getElementById('signInSection');
@@ -418,6 +419,11 @@
     onAuthChange(async (user) => {
       currentUser = user;
       if (user) {
+        // Skip role check if we're in the middle of creating a user
+        if (isCreatingUser) {
+          return;
+        }
+
         const role = await getUserRole(user.email);
         if (role === 'admin') {
           showAdminPanel();
@@ -426,7 +432,10 @@
           await logOut();
         }
       } else {
-        showSignIn();
+        // Don't show sign-in if we're creating users
+        if (!isCreatingUser) {
+          showSignIn();
+        }
       }
     });
 
@@ -552,26 +561,29 @@
       const saveBtn = document.getElementById('saveUserBtn');
       saveBtn.disabled = true;
       saveBtn.textContent = 'Creating...';
-      
+
       try {
+        // Set flag to suppress auth state warnings
+        isCreatingUser = true;
+
         // Create user in Firebase Auth
         const authResult = await createAuthUser(email, password);
         if (!authResult.success) {
           throw new Error(authResult.error);
         }
-        
+
         // Re-authenticate as admin (creating user signs us out)
         if (currentAdminCredentials) {
           await signInWithEmailAndPassword(
-            getAuthInstance(), 
-            currentAdminCredentials.email, 
+            getAuthInstance(),
+            currentAdminCredentials.email,
             currentAdminCredentials.password
           );
         }
-        
+
         // Create user in Firestore
         await createUser(email, { role, assignedJobs });
-        
+
         bootstrap.Modal.getInstance(document.getElementById('addUserModal')).hide();
         document.getElementById('addUserForm').reset();
         loadUsers();
@@ -582,8 +594,8 @@
         if (currentAdminCredentials) {
           try {
             await signInWithEmailAndPassword(
-              getAuthInstance(), 
-              currentAdminCredentials.email, 
+              getAuthInstance(),
+              currentAdminCredentials.email,
               currentAdminCredentials.password
             );
           } catch (e) {
@@ -591,6 +603,7 @@
           }
         }
       } finally {
+        isCreatingUser = false; // Clear flag
         saveBtn.disabled = false;
         saveBtn.textContent = 'Create User';
       }
@@ -739,75 +752,83 @@
     // Confirm users upload - creates Auth accounts one by one
     document.getElementById('confirmUsersUpload').addEventListener('click', async () => {
       if (!parsedUsersCSV || parsedUsersCSV.length === 0) return;
-      
+
       const confirmBtn = document.getElementById('confirmUsersUpload');
       confirmBtn.disabled = true;
-      
+
       const progressEl = document.getElementById('uploadProgress');
       const progressBar = document.getElementById('uploadProgressBar');
       const statusEl = document.getElementById('uploadStatus');
       progressEl.classList.remove('d-none');
-      
+
       const results = { success: [], failed: [] };
-      
-      for (let i = 0; i < parsedUsersCSV.length; i++) {
-        const user = parsedUsersCSV[i];
-        const progress = Math.round(((i + 1) / parsedUsersCSV.length) * 100);
-        progressBar.style.width = `${progress}%`;
-        statusEl.textContent = `Creating ${user.email}... (${i + 1}/${parsedUsersCSV.length})`;
-        
-        try {
-          // Create in Firebase Auth
-          const authResult = await createAuthUser(user.email, user.password);
-          if (!authResult.success) {
-            throw new Error(authResult.error);
-          }
-          
-          // Re-authenticate as admin
-          if (currentAdminCredentials) {
-            await signInWithEmailAndPassword(
-              getAuthInstance(), 
-              currentAdminCredentials.email, 
-              currentAdminCredentials.password
-            );
-          }
-          
-          // Create in Firestore
-          await createUser(user.email, { 
-            role: user.role, 
-            assignedJobs: user.assignedJobs 
-          });
-          
-          results.success.push(user.email);
-        } catch (error) {
-          results.failed.push({ email: user.email, error: error.message });
-          
-          // Re-authenticate admin if needed
-          if (currentAdminCredentials) {
-            try {
+
+      // Set flag to suppress auth state warnings during bulk user creation
+      isCreatingUser = true;
+
+      try {
+        for (let i = 0; i < parsedUsersCSV.length; i++) {
+          const user = parsedUsersCSV[i];
+          const progress = Math.round(((i + 1) / parsedUsersCSV.length) * 100);
+          progressBar.style.width = `${progress}%`;
+          statusEl.textContent = `Creating ${user.email}... (${i + 1}/${parsedUsersCSV.length})`;
+
+          try {
+            // Create in Firebase Auth
+            const authResult = await createAuthUser(user.email, user.password);
+            if (!authResult.success) {
+              throw new Error(authResult.error);
+            }
+
+            // Re-authenticate as admin
+            if (currentAdminCredentials) {
               await signInWithEmailAndPassword(
-                getAuthInstance(), 
-                currentAdminCredentials.email, 
+                getAuthInstance(),
+                currentAdminCredentials.email,
                 currentAdminCredentials.password
               );
-            } catch (e) {
-              console.error('Re-auth failed:', e);
+            }
+
+            // Create in Firestore
+            await createUser(user.email, {
+              role: user.role,
+              assignedJobs: user.assignedJobs
+            });
+
+            results.success.push(user.email);
+          } catch (error) {
+            results.failed.push({ email: user.email, error: error.message });
+
+            // Re-authenticate admin if needed
+            if (currentAdminCredentials) {
+              try {
+                await signInWithEmailAndPassword(
+                  getAuthInstance(),
+                  currentAdminCredentials.email,
+                  currentAdminCredentials.password
+                );
+              } catch (e) {
+                console.error('Re-auth failed:', e);
+              }
             }
           }
         }
+
+        // Show results
+        let message = `Created ${results.success.length} users successfully.`;
+        if (results.failed.length > 0) {
+          message += `\n\nFailed (${results.failed.length}):\n` +
+            results.failed.map(f => `${f.email}: ${f.error}`).join('\n');
+        }
+        alert(message);
+
+        bootstrap.Modal.getInstance(document.getElementById('uploadUsersModal')).hide();
+        loadUsers();
+      } finally {
+        // Clear flag after all users are created
+        isCreatingUser = false;
+        confirmBtn.disabled = false;
       }
-      
-      // Show results
-      let message = `Created ${results.success.length} users successfully.`;
-      if (results.failed.length > 0) {
-        message += `\n\nFailed (${results.failed.length}):\n` + 
-          results.failed.map(f => `${f.email}: ${f.error}`).join('\n');
-      }
-      alert(message);
-      
-      bootstrap.Modal.getInstance(document.getElementById('uploadUsersModal')).hide();
-      confirmBtn.disabled = false;
-      loadUsers();
     });
 
     // ============================================================

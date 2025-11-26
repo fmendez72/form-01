@@ -182,6 +182,19 @@ q1,dropdown,Question?,Help text,yes,Yes|No|Unknown,,q5,Section A
 ### 4. Input Event Handling - IMPROVED
 **Change**: Switched from `onchange` to `oninput` for immediate data capture on text/textarea/number fields.
 
+### 5. Admin Logout During User Creation - FIXED
+**Problem**: Admin was logged out and re-authenticated during user creation, causing auth state warnings and jarring UX.
+**Solution**: Added `isCreatingUser` flag to suppress auth state listener warnings during user creation process. Admin remains seamlessly authenticated throughout.
+
+### 6. Collapsible Group Sections - IMPLEMENTED
+**Problem**: Group headers in templates (e.g., `employee-survey-grouped.csv`) were rendered as regular form rows with non-functional icons.
+**Solution**: Implemented proper collapsible sections:
+- Fields with `_header` suffix render as full-width section headers
+- Clickable toggle icon (▶/▼) to expand/collapse groups
+- Answer, help, and notes cells hidden for header rows
+- Visual styling with blue left border and gray background
+- State persists across renders
+
 ## Key Workflows
 
 ### Form Data Flow

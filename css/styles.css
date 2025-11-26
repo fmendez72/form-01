@@ -289,3 +289,22 @@ body {
   margin-bottom: 20px;
   opacity: 0.5;
 }
+
+/* Group Headers in Forms */
+.group-header-cell {
+  background-color: #f8f9fa !important;
+  border: none !important;
+}
+
+.group-header-hidden-cell {
+  display: none !important;
+}
+
+.handsontable tr.hidden-row {
+  display: none !important;
+}
+
+/* Ensure notes column is also hidden for group headers */
+.handsontable td.group-header-notes {
+  display: none !important;
+}

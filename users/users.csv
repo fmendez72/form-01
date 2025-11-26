@@ -1,4 +1,4 @@
 user_email,password,assigned_jobs,role
-admin@example.com,Admin123!,"ref-1,agenda-1",admin
-coder1@example.com,Coder123!,ref-1,coder
-coder2@example.com,Coder456!,"ref-1,agenda-1",coder
+admin@example.com,admin123,"doc-coding,employee-1,gov-1,ref-1",admin
+coder1@example.com,coder123,"doc-coding,employee-1,gov-1,ref-1",coder
+coder2@example.com,coder456,ref-1,coder
