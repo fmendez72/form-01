@@ -1,0 +1,25 @@
+field_id,field_type,label,help_text,required,options,default_value,group
+g1_header,text,▼ WORK ENVIRONMENT,Click to expand/collapse this section,no,,,Work Environment
+q01,dropdown,Office facilities are adequate,Rate the quality of physical workspace,yes,Strongly Agree|Agree|Neutral|Disagree|Strongly Disagree,,Work Environment
+q02,dropdown,Equipment meets my needs,Computers and tools provided are sufficient,yes,Strongly Agree|Agree|Neutral|Disagree|Strongly Disagree,,Work Environment
+q03,dropdown,Workspace is comfortable,Temperature lighting and ergonomics are appropriate,yes,Strongly Agree|Agree|Neutral|Disagree|Strongly Disagree,,Work Environment
+q04,dropdown,Safety standards are met,Workplace complies with health and safety requirements,yes,Strongly Agree|Agree|Neutral|Disagree|Strongly Disagree,,Work Environment
+q05,textarea,Environment comments,Additional comments on work environment,no,,,Work Environment
+g2_header,text,▼ MANAGEMENT & LEADERSHIP,Click to expand/collapse this section,no,,,Management
+q06,dropdown,My manager provides clear direction,I understand what is expected of me,yes,Strongly Agree|Agree|Neutral|Disagree|Strongly Disagree,,Management
+q07,dropdown,I receive regular feedback,Performance feedback is given constructively,yes,Strongly Agree|Agree|Neutral|Disagree|Strongly Disagree,,Management
+q08,dropdown,Management is approachable,I feel comfortable raising concerns,yes,Strongly Agree|Agree|Neutral|Disagree|Strongly Disagree,,Management
+q09,dropdown,Decisions are communicated well,Company decisions are explained clearly,yes,Strongly Agree|Agree|Neutral|Disagree|Strongly Disagree,,Management
+q10,textarea,Management comments,Additional comments on leadership,no,,,Management
+g3_header,text,▼ CAREER DEVELOPMENT,Click to expand/collapse this section,no,,,Career
+q11,dropdown,Training opportunities are available,I can access relevant professional development,yes,Strongly Agree|Agree|Neutral|Disagree|Strongly Disagree,,Career
+q12,dropdown,Career path is clear,I understand how to advance in this organization,yes,Strongly Agree|Agree|Neutral|Disagree|Strongly Disagree,,Career
+q13,dropdown,Skills are being developed,My role allows me to grow professionally,yes,Strongly Agree|Agree|Neutral|Disagree|Strongly Disagree,,Career
+q14,dropdown,Promotion process is fair,Advancement decisions are made transparently,yes,Strongly Agree|Agree|Neutral|Disagree|Strongly Disagree,,Career
+q15,textarea,Career comments,Additional comments on development opportunities,no,,,Career
+g4_header,text,▼ OVERALL SATISFACTION,Click to expand/collapse this section,no,,,Overall
+q16,dropdown,I would recommend this company,I would suggest friends apply here,yes,Strongly Agree|Agree|Neutral|Disagree|Strongly Disagree,,Overall
+q17,dropdown,I plan to stay long-term,I see myself here in 2+ years,yes,Strongly Agree|Agree|Neutral|Disagree|Strongly Disagree,,Overall
+q18,dropdown,Work-life balance is good,I can maintain healthy personal boundaries,yes,Strongly Agree|Agree|Neutral|Disagree|Strongly Disagree,,Overall
+q19,number,Overall satisfaction (1-10),Rate your overall job satisfaction,yes,,,Overall
+q20,textarea,Final comments,Any other feedback you would like to share,no,,,Overall

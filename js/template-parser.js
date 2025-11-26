@@ -108,12 +108,16 @@ function transformField(field, rowNum) {
     defaultValue: field.default_value || '',
     validation: field.validation || '',
     skipToIfNo: field.skip_to_if_no || '',
+    group: field.group || '',
     width: field.width || ''
   };
 }
 
 // Convert parsed fields to full template schema
 export function createTemplateSchema(jobId, title, description, fields, helpDisplay = 'tooltip') {
+  // Extract unique groups
+  const groups = [...new Set(fields.map(f => f.group).filter(g => g))];
+  
   return {
     jobId: jobId,
     title: title,
@@ -121,6 +125,7 @@ export function createTemplateSchema(jobId, title, description, fields, helpDisp
     version: 1,
     helpDisplay: helpDisplay, // 'tooltip', 'inline', 'column'
     fields: fields,
+    groups: groups,
     createdAt: new Date().toISOString(),
     status: 'active'
   };
@@ -158,13 +163,13 @@ export function validateTemplateSchema(schema) {
 
 // Generate example CSV template
 export function getExampleCSV() {
-  return `field_id,field_type,label,help_text,required,options,default_value,skip_to_if_no
-q1,dropdown,Is there a referendum provision?,A referendum is a direct vote by citizens on a specific issue or law.,yes,Yes|No|Unknown,,q8
-q2,dropdown,Type of referendum,Select the primary type of referendum allowed.,yes,Mandatory|Optional|Citizen-initiated,,
-q3,number,Signature threshold (%),Percentage of electorate required to trigger referendum.,yes,,,
-q4,radio,Constitutional basis?,Is the referendum explicitly mentioned in the constitution?,yes,Yes|No,,
-q5,text,Relevant article/section,Citation of the legal provision (e.g. Art. 75),no,,,
-q6,textarea,Brief description,Summarize the referendum mechanism in 2-3 sentences.,no,,,
-q7,date,Date of adoption,When was this provision enacted?,no,,,
-q8,textarea,Additional notes,Any other observations or comments.,no,,,`;
+  return `field_id,field_type,label,help_text,required,options,default_value,skip_to_if_no,group
+q1,dropdown,Is there a referendum provision?,A referendum is a direct vote by citizens on a specific issue or law.,yes,Yes|No|Unknown,,q8,
+q2,dropdown,Type of referendum,Select the primary type of referendum allowed.,yes,Mandatory|Optional|Citizen-initiated,,,
+q3,number,Signature threshold (%),Percentage of electorate required to trigger referendum.,yes,,,,
+q4,radio,Constitutional basis?,Is the referendum explicitly mentioned in the constitution?,yes,Yes|No,,,
+q5,text,Relevant article/section,Citation of the legal provision (e.g. Art. 75),no,,,,
+q6,textarea,Brief description,Summarize the referendum mechanism in 2-3 sentences.,no,,,,
+q7,date,Date of adoption,When was this provision enacted?,no,,,,
+q8,textarea,Additional notes,Any other observations or comments.,no,,,,`;
 }

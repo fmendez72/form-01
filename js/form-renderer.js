@@ -118,6 +118,7 @@ function buildDataArray(fields, responseData = {}) {
     type: field.type,
     options: field.options || [],
     required: field.required,
+    group: field.group || '',
     answer: responseData[field.id] ?? field.defaultValue ?? '',
     note: responseData[`${field.id}_note`] ?? ''
   }));
@@ -247,7 +248,8 @@ function answerRenderer(instance, td, row, col, prop, value, cellProperties) {
       input.value = value || '';
       input.disabled = isReadOnly;
       
-      input.onchange = () => {
+      // Use input event for immediate updates
+      input.oninput = () => {
         instance.setDataAtRowProp(row, 'answer', input.value);
       };
       break;
@@ -259,21 +261,63 @@ function answerRenderer(instance, td, row, col, prop, value, cellProperties) {
       input.value = value || '';
       input.disabled = isReadOnly;
       
-      input.onchange = () => {
+      // Use input event for immediate updates
+      input.oninput = () => {
         instance.setDataAtRowProp(row, 'answer', input.value);
       };
       break;
       
     case 'date':
-      input = document.createElement('input');
-      input.type = 'date';
-      input.className = 'form-control form-control-sm';
-      input.value = value || '';
-      input.disabled = isReadOnly;
+      // Create a container for date input with better UX
+      input = document.createElement('div');
+      input.className = 'd-flex align-items-center gap-2';
       
-      input.onchange = () => {
-        instance.setDataAtRowProp(row, 'answer', input.value);
+      const dateInput = document.createElement('input');
+      dateInput.type = 'text';
+      dateInput.className = 'form-control form-control-sm';
+      dateInput.placeholder = 'YYYY-MM-DD';
+      dateInput.value = value || '';
+      dateInput.disabled = isReadOnly;
+      dateInput.style.flex = '1';
+      
+      // Add date picker button
+      const dateBtn = document.createElement('button');
+      dateBtn.type = 'button';
+      dateBtn.className = 'btn btn-outline-secondary btn-sm';
+      dateBtn.innerHTML = '📅';
+      dateBtn.disabled = isReadOnly;
+      dateBtn.title = 'Open date picker';
+      
+      // Hidden native date picker
+      const nativePicker = document.createElement('input');
+      nativePicker.type = 'date';
+      nativePicker.style.position = 'absolute';
+      nativePicker.style.opacity = '0';
+      nativePicker.style.width = '0';
+      nativePicker.style.height = '0';
+      nativePicker.disabled = isReadOnly;
+      
+      // Sync text input to data
+      dateInput.oninput = () => {
+        instance.setDataAtRowProp(row, 'answer', dateInput.value);
       };
+      
+      // Open native picker on button click
+      dateBtn.onclick = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        nativePicker.showPicker?.() || nativePicker.click();
+      };
+      
+      // Sync native picker to text input
+      nativePicker.onchange = () => {
+        dateInput.value = nativePicker.value;
+        instance.setDataAtRowProp(row, 'answer', nativePicker.value);
+      };
+      
+      input.appendChild(dateInput);
+      input.appendChild(dateBtn);
+      input.appendChild(nativePicker);
       break;
       
     case 'text':
@@ -284,7 +328,8 @@ function answerRenderer(instance, td, row, col, prop, value, cellProperties) {
       input.value = value || '';
       input.disabled = isReadOnly;
       
-      input.onchange = () => {
+      // Use input event for immediate updates
+      input.oninput = () => {
         instance.setDataAtRowProp(row, 'answer', input.value);
       };
       break;
@@ -331,6 +376,25 @@ function showHelpTooltip(element, text) {
   }, 100);
 }
 
+// Force all inputs to sync their values to the data model
+// This is important before saving/submitting to capture any unsaved edits
+export function syncAllInputs() {
+  if (!hotInstance) return;
+  
+  // Find all input elements in the Handsontable container
+  const container = hotInstance.rootElement;
+  const inputs = container.querySelectorAll('input, select, textarea');
+  
+  inputs.forEach(input => {
+    // Trigger the input/change event to sync values
+    if (input.tagName === 'SELECT') {
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    } else {
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+  });
+}
+
 // Extract response data from Handsontable
 export function extractResponseData(fields) {
   if (!hotInstance) return {};
@@ -352,6 +416,9 @@ export function extractResponseData(fields) {
 // Validate required fields
 export function validateForm(fields) {
   if (!hotInstance) return { valid: true, errors: [] };
+  
+  // First sync all inputs to ensure we have latest data
+  syncAllInputs();
   
   const errors = [];
   const sourceData = hotInstance.getSourceData();

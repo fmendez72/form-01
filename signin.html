@@ -121,7 +121,7 @@
   <script type="module">
     import { signIn, logOut, onAuthChange, getUserData } from './js/auth.js';
     import { getTemplate, getAllTemplates, getOrCreateResponse, updateResponseData, submitResponse } from './js/firestore-service.js';
-    import { initializeForm, extractResponseData, validateForm, destroyForm } from './js/form-renderer.js';
+    import { initializeForm, extractResponseData, validateForm, destroyForm, syncAllInputs } from './js/form-renderer.js';
 
     // State
     let currentUser = null;
@@ -210,6 +210,12 @@
 
     // Submit response
     document.getElementById('submitBtn').addEventListener('click', async () => {
+      // First sync all inputs to capture any unsaved edits
+      syncAllInputs();
+      
+      // Small delay to ensure sync is complete
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       const validation = validateForm(currentTemplate.fields);
       if (!validation.valid) {
         const errorMessages = validation.errors.map(e => `Row ${e.row}: ${e.label}`).join('\n');
@@ -221,6 +227,7 @@
         return;
       }
       
+      // Save before submitting
       await saveDraft();
       await submitResponse(currentResponse.responseId);
       alert('Response submitted successfully!');
@@ -396,6 +403,9 @@
     // Save draft
     async function saveDraft() {
       if (!currentResponse || currentResponse.status === 'submitted') return;
+      
+      // Sync all inputs before extracting data
+      syncAllInputs();
       
       const data = extractResponseData(currentTemplate.fields);
       await updateResponseData(currentResponse.responseId, data);

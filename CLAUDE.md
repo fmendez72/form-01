@@ -4,6 +4,21 @@
 
 Political Data Collection App v3.0 - A serverless SPA for systematic collection of political science research data. Complete redesign from v2.2 to address flexibility and usability limitations.
 
+**Repository**: https://github.com/fmendez72/form-01
+
+## Current Status (Latest Update)
+
+The application is functional with the following features working:
+- ✅ Admin sign-in and panel
+- ✅ Manual user creation with password
+- ✅ CSV user upload (creates Firebase Auth + Firestore records)
+- ✅ Template CSV upload
+- ✅ Coder sign-in and job dashboard
+- ✅ Form rendering with all field types
+- ✅ Auto-save and manual save
+- ✅ Submit workflow
+- ✅ Response viewing and CSV export
+
 ## Architecture
 
 ### Technology Stack
@@ -24,7 +39,8 @@ Political Data Collection App v3.0 - A serverless SPA for systematic collection 
 | `js/firestore-service.js` | All Firestore CRUD operations |
 | `js/template-parser.js` | CSV → JSON schema conversion |
 | `js/form-renderer.js` | Handsontable dynamic form rendering |
-| `firestore.rules` | Firestore security rules |
+| `firestore.rules` | Firestore security rules (minimal for dev) |
+| `firestore.rules.production` | Strict rules for production use |
 
 ## Firestore Data Model
 
@@ -45,7 +61,8 @@ templates/{jobId}
 ├── description: string
 ├── version: number
 ├── helpDisplay: "tooltip" | "column" | "inline"
-├── fields: [{ id, type, label, help, required, options, ... }]
+├── fields: [{ id, type, label, help, required, options, group, ... }]
+├── groups: string[] (unique group names extracted from fields)
 ├── createdBy: string
 ├── createdAt: timestamp
 ├── updatedAt: timestamp
@@ -63,6 +80,27 @@ responses/{responseId}
 └── submittedAt: timestamp | null
 ```
 
+## Firestore Security Rules
+
+### Development Rules (Current)
+The current `firestore.rules` uses minimal/permissive rules for development:
+```javascript
+match /{document=**} {
+  allow read, write: if request.auth != null;
+}
+```
+This allows any authenticated user to read/write all documents.
+
+### Production Rules
+When deploying to production, use `firestore.rules.production` which enforces:
+- Admins: full CRUD on all collections
+- Coders: read templates, read/write own responses only
+- No deletions of responses
+
+**To deploy production rules:**
+1. Copy contents of `firestore.rules.production` to Firebase Console > Firestore > Rules
+2. Or rename the file and deploy via Firebase CLI
+
 ## User Management
 
 ### Creating Users
@@ -72,168 +110,187 @@ Users require both:
 2. **Firestore user document** - for role and job assignments
 
 #### Manual Creation (Admin Panel)
-- Admin enters email, password, role, and assigned jobs
-- App creates Firebase Auth account via `createUserWithEmailAndPassword()`
-- App then creates Firestore document
-- **Note**: Creating a user temporarily signs out the admin; app re-authenticates automatically
+1. Click "+ Add User"
+2. Enter email, password (min 6 chars), role, assigned jobs
+3. Click "Create User"
 
 #### CSV Upload
-CSV format: `user_email,password,assigned_jobs,role`
-
-Example:
+1. Click "↑ Upload CSV"
+2. Select CSV file with format:
 ```csv
 user_email,password,assigned_jobs,role
-admin@example.com,Admin123!,"ref-1,agenda-1",admin
-coder1@example.com,Coder123!,ref-1,coder
-coder2@example.com,Coder456!,"ref-1,agenda-1",coder
+john@example.com,SecurePass123!,"job-1,job-2",coder
 ```
+3. Preview and confirm
 
-**Important notes:**
-- Passwords must be at least 6 characters
-- `assigned_jobs` can be comma-separated within quotes
-- Users are created one at a time (not batched) due to Firebase Auth limitations
-- Progress bar shows creation status
+**CSV Column Mapping:**
+- `user_email` or `email` → user's email
+- `password` → user's password (min 6 chars)
+- `assigned_jobs` or `assignedJobs` → comma-separated job IDs
+- `role` → "admin" or "coder"
+
+**Process:**
+- Users are created one at a time (Firebase Auth limitation)
+- Progress bar shows status
+- Admin is re-authenticated after each user creation
 - Failed users are reported at the end
 
 ### Editing/Deleting Users
 - Edit: Change role, assigned jobs, or status (active/disabled)
 - Delete: Removes Firestore document only; Firebase Auth account persists
-- To fully remove a user, delete from Firebase Console > Authentication
+- To fully remove a user, also delete from Firebase Console > Authentication
+
+## Template Management
+
+### Template CSV Format
+```csv
+field_id,field_type,label,help_text,required,options,default_value,skip_to_if_no,group
+q1,dropdown,Question?,Help text,yes,Yes|No|Unknown,,q5,Section A
+```
+
+### Field Types
+- `text`: Single-line text input
+- `textarea`: Multi-line text input
+- `dropdown`: Single select from options (pipe-separated)
+- `radio`: Radio buttons for 2-5 options
+- `number`: Numeric input
+- `date`: Date with text input + calendar picker button
+
+### Available Templates
+
+| Template | Fields | Purpose |
+|----------|--------|---------|
+| `referendum-example.csv` | 8 | Basic referendum assessment |
+| `governance-assessment.csv` | 30 | Long-form country governance with sections |
+| `employee-survey-grouped.csv` | 20 | Grouped items demonstration (4 groups) |
+| `document-coding.csv` | 24 | Research document coding platform |
+
+## Recent Bug Fixes
+
+### 1. Data Loss on Submit - FIXED
+**Problem**: Changes in current cell not saved when clicking Submit.
+**Solution**: Added `syncAllInputs()` function that forces all inputs to dispatch events before data extraction.
+
+### 2. Date Field Entry - FIXED
+**Problem**: HTML5 date picker had issues with year entry.
+**Solution**: Hybrid approach with text input (YYYY-MM-DD) + calendar button (📅).
+
+### 3. User CSV Upload Permissions - FIXED
+**Problem**: Permission denied when creating Firestore user documents after CSV upload.
+**Solution**: Simplified Firestore rules to allow any authenticated user to write. Production rules available separately.
+
+### 4. Input Event Handling - IMPROVED
+**Change**: Switched from `onchange` to `oninput` for immediate data capture on text/textarea/number fields.
 
 ## Key Workflows
 
-### Template Creation
-1. Admin uploads CSV file
-2. `template-parser.js` parses CSV → field array
-3. `createTemplateSchema()` wraps fields with metadata
-4. `createTemplate()` stores in Firestore
+### Form Data Flow
+1. Template loaded → fields array passed to `initializeForm()`
+2. Handsontable renders with custom `answerRenderer()` for each cell
+3. User edits trigger immediate data sync via `oninput` events
+4. `syncAllInputs()` called before save/submit to capture pending edits
+5. `extractResponseData()` reads from Handsontable source data
+6. Data saved to Firestore via `updateResponseData()`
 
-### Form Entry
-1. Coder selects job from dashboard
-2. `getOrCreateResponse()` returns existing draft or creates new
-3. `initializeForm()` renders Handsontable with dynamic column types
-4. Auto-save every 30 seconds via `updateResponseData()`
-5. Submit changes status to "submitted", locks editing
+### User Creation Flow (CSV)
+1. Admin uploads CSV → PapaParse parses to array
+2. For each user:
+   a. Create Firebase Auth account (signs in as new user)
+   b. Re-authenticate as admin
+   c. Create Firestore user document
+3. Report successes and failures
 
-### Response Export
-1. Admin filters by job
-2. `responsesToCSV()` generates CSV with all fields + notes
-3. Download triggered via blob URL
-
-## Admin Panel Features
-
-### Users Section
-- View all users in table format
-- Add single user (with password)
-- Upload users via CSV (creates Auth + Firestore)
-- Edit user (role, jobs, status)
-- Delete user (Firestore only)
-
-### Templates Section
-- View all templates
-- Upload new template CSV
-- View template details (fields, options)
-- Delete template
-
-### Responses Section
-- View all responses
-- Filter by job and status
-- View individual response details
-- Export to CSV (submitted only)
-
-## Common Issues & Solutions
-
-### Issue: "Cannot create user" error
-- Check password is at least 6 characters
-- Email might already exist in Firebase Auth
-- Check browser console for specific error
-
-### Issue: Admin gets signed out when creating users
-- This is expected behavior - creating a user via client SDK signs in as that user
-- App automatically re-authenticates admin using stored credentials
-- If re-auth fails, admin needs to sign in again
-
-### Issue: User can sign in but sees "User profile not found"
-- User exists in Firebase Auth but not in Firestore
-- Create Firestore document manually or via admin panel
-
-### Issue: Form not rendering
-- Check browser console for Handsontable errors
-- Verify template has valid fields array
-- Ensure Handsontable CSS/JS loaded from CDN
-
-### Issue: Permission denied on Firestore
-- Deploy latest `firestore.rules`
-- Verify user email matches document ownership
-- Check draft status for update operations
-
-## CSV Formats
-
-### Users CSV
-```csv
-user_email,password,assigned_jobs,role
-john@example.com,SecurePass123!,"job-1,job-2",coder
-```
-
-### Template CSV
-```csv
-field_id,field_type,label,help_text,required,options,default_value,skip_to_if_no
-q1,dropdown,Question text?,Help text,yes,Yes|No|Unknown,,q5
-q2,text,Text question,Instructions,no,,,
-```
-
-## File Locations
+## File Structure
 
 ```
 form-01/
-├── index.html          # Landing page
-├── signin.html         # Coder interface
-├── admin.html          # Admin panel
-├── css/styles.css      # Custom styles
+├── index.html              # Landing page
+├── index.qmd               # Quarto source for landing page
+├── signin.html             # Coder interface
+├── admin.html              # Admin panel
+├── css/
+│   └── styles.css          # Custom styles
 ├── js/
-│   ├── firebase-config.js
-│   ├── auth.js
-│   ├── firestore-service.js
-│   ├── template-parser.js
-│   └── form-renderer.js
+│   ├── firebase-config.js  # Firebase initialization
+│   ├── auth.js             # Authentication functions
+│   ├── firestore-service.js # Firestore CRUD
+│   ├── template-parser.js  # CSV parsing
+│   └── form-renderer.js    # Handsontable rendering
 ├── templates/
-│   └── referendum-example.csv
+│   ├── referendum-example.csv
+│   ├── governance-assessment.csv
+│   ├── employee-survey-grouped.csv
+│   └── document-coding.csv
 ├── users/
-│   └── users.csv       # Example users CSV
-├── firestore.rules
+│   └── users.csv           # Example users CSV
+├── firestore.rules         # Current rules (minimal/dev)
+├── firestore.rules.production # Strict rules for production
 ├── README.md
 └── CLAUDE.md
 ```
 
+## Common Issues & Solutions
+
+### Issue: "Permission denied" when creating users
+- Ensure `firestore.rules` has been deployed to Firebase Console
+- Current rules allow any authenticated user to write
+- Check Firebase Console > Firestore > Rules
+
+### Issue: Admin gets signed out when creating users
+- Expected behavior - creating user signs in as that user
+- App automatically re-authenticates admin
+- Ensure admin credentials are stored (happens on login)
+
+### Issue: User can sign in but sees "User profile not found"
+- User exists in Firebase Auth but not in Firestore
+- Create Firestore document via admin panel (edit user) or manually
+
+### Issue: Form data not saving
+- Check browser console for errors
+- Verify `syncAllInputs()` is called before `extractResponseData()`
+- Check Firestore rules allow writes
+
+### Issue: Date field showing wrong format
+- Expected format: YYYY-MM-DD (ISO)
+- Use the 📅 button for calendar picker
+- Manual entry requires YYYY-MM-DD format
+
 ## Future Enhancements (Phase 2+)
 
-- [ ] Conditional logic (`skip_to_if_no` field)
+### Planned Features
+- [ ] **Conditional logic**: Implement `skip_to_if_no` field jumping
+- [ ] **Grouped display**: Collapsible sections based on `group` field
+- [ ] **Validation**: Implement regex validation patterns
 - [ ] Template versioning with migration
 - [ ] Response editing by admin
 - [ ] Email notifications
 - [ ] Form builder UI
-- [ ] Advanced validation rules
-- [ ] Bulk user deletion (requires Firebase Admin SDK / Cloud Functions)
 
 ## Development Notes
+
+### Deploying Firestore Rules
+```bash
+# Using Firebase CLI
+firebase deploy --only firestore:rules
+
+# Or manually copy to Firebase Console > Firestore > Rules
+```
+
+### Testing User Management
+1. Clear all collections in Firestore (if starting fresh)
+2. Ensure your admin user exists in both Auth and Firestore
+3. Deploy the minimal `firestore.rules`
+4. Upload users via CSV
+5. Verify users appear in both Auth and Firestore
 
 ### Adding a New Field Type
 1. Add type to `validTypes` in `template-parser.js`
 2. Add case in `answerRenderer()` in `form-renderer.js`
-3. Update documentation
-
-### Modifying Firestore Schema
-1. Update `firestore-service.js` functions
-2. Update `firestore.rules` if permissions change
-3. Test with fresh data (or write migration script)
-
-### Firebase Auth Limitations (Client-Side)
-- Cannot delete Auth users from client SDK
-- Cannot list all Auth users from client SDK
-- Creating users signs in as the new user (requires re-auth)
-- For full user management, consider Firebase Admin SDK via Cloud Functions
+3. Ensure proper event handling
+4. Update documentation
 
 ## Contact
 
 Project Owner: Fernando Mendez
 Repository: https://github.com/fmendez72/form-01
+Firebase Project: data-collector-2025
