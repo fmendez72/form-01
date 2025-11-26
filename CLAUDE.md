@@ -316,6 +316,11 @@ form-01/
 │   ├── conditional-form.csv
 │   ├── grouped-likert.csv
 │   └── document-coding.csv
+├── scripts/
+│   ├── upload_templates.py # Python script for bulk template upload
+│   ├── requirements.txt    # Python dependencies
+│   ├── firebase-config.json.example  # Example service account key
+│   └── README.md           # Script documentation
 ├── users/
 │   └── users.csv           # Example users CSV
 ├── firestore.rules         # Current rules (minimal/dev)
@@ -368,6 +373,39 @@ form-01/
 - [ ] Form builder UI (visual CSV editor)
 
 ## Development Notes
+
+### Uploading Templates (Fast Method)
+
+For testing and debugging, use the Python script to upload templates directly to Firestore:
+
+```bash
+# One-time setup
+pip install -r scripts/requirements.txt
+
+# Get Firebase service account key (one time)
+# 1. Firebase Console > Project Settings > Service Accounts
+# 2. Generate New Private Key
+# 3. Save as scripts/firebase-config.json
+
+# Upload all templates
+python scripts/upload_templates.py
+
+# Upload specific template
+python scripts/upload_templates.py simple-survey
+
+# Clear and re-upload
+python scripts/upload_templates.py --clear
+
+# Validate without uploading
+python scripts/upload_templates.py --dry-run
+```
+
+**Benefits:**
+- ⚡ Much faster than admin panel (2 seconds vs minutes)
+- ✅ Validates CSV structure before upload
+- 🔄 Easy to iterate during development
+- 🔒 Uses service account (no manual auth needed)
+- 📝 See [scripts/README.md](scripts/README.md) for full documentation
 
 ### Deploying Firestore Rules
 ```bash
