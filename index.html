@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Political Data Collection App</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="css/styles.css" rel="stylesheet">
+  <style>
+    .hero-section {
+      background: linear-gradient(135deg, #2c5282 0%, #4a5568 100%);
+      color: white;
+      padding: 80px 20px;
+      text-align: center;
+    }
+    .card-link {
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .card-link:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+    }
+  </style>
+</head>
+<body>
+  <div class="hero-section">
+    <div class="container">
+      <h1 class="display-4 mb-3">📊 Political Data Collection</h1>
+      <p class="lead">A web application for systematic collection of political science research data</p>
+    </div>
+  </div>
+
+  <div class="container py-5">
+    <div class="row justify-content-center mb-5">
+      <div class="col-md-8 text-center">
+        <h2>About This Project</h2>
+        <p class="text-muted">
+          This application facilitates distributed data collection for research on citizen-initiated 
+          democratic instruments across countries. Research assistants complete structured questionnaires, 
+          while administrators manage templates, users, and analyze submitted responses.
+        </p>
+      </div>
+    </div>
+
+    <div class="row justify-content-center g-4">
+      <div class="col-md-4">
+        <a href="signin.html" class="text-decoration-none">
+          <div class="card card-link h-100 text-center p-4">
+            <div class="card-body">
+              <div style="font-size: 48px; margin-bottom: 15px;">👤</div>
+              <h4 class="card-title">Research Assistants</h4>
+              <p class="card-text text-muted">
+                Sign in to view your assigned questionnaires and submit responses.
+              </p>
+              <span class="btn btn-primary mt-2">Sign In</span>
+            </div>
+          </div>
+        </a>
+      </div>
+      
+      <div class="col-md-4">
+        <a href="admin.html" class="text-decoration-none">
+          <div class="card card-link h-100 text-center p-4">
+            <div class="card-body">
+              <div style="font-size: 48px; margin-bottom: 15px;">⚙️</div>
+              <h4 class="card-title">Administrators</h4>
+              <p class="card-text text-muted">
+                Manage users, create questionnaire templates, and review submitted data.
+              </p>
+              <span class="btn btn-secondary mt-2">Admin Panel</span>
+            </div>
+          </div>
+        </a>
+      </div>
+    </div>
+
+    <div class="row justify-content-center mt-5">
+      <div class="col-md-8">
+        <h3 class="text-center mb-4">Features</h3>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <div class="d-flex align-items-start">
+              <span class="me-3">📝</span>
+              <div>
+                <strong>Flexible Questionnaires</strong>
+                <p class="small text-muted mb-0">Multiple field types: dropdowns, text, radio buttons, dates</p>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="d-flex align-items-start">
+              <span class="me-3">🔐</span>
+              <div>
+                <strong>Role-Based Access</strong>
+                <p class="small text-muted mb-0">Separate interfaces for coders and administrators</p>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="d-flex align-items-start">
+              <span class="me-3">💾</span>
+              <div>
+                <strong>Auto-Save Drafts</strong>
+                <p class="small text-muted mb-0">Never lose your work with automatic draft saving</p>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="d-flex align-items-start">
+              <span class="me-3">📊</span>
+              <div>
+                <strong>CSV Export</strong>
+                <p class="small text-muted mb-0">Export collected data for analysis</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="text-center py-4 text-muted">
+    <small>Political Data Collection App v3.0 | Built with Firebase</small>
+  </footer>
+</body>
+</html>

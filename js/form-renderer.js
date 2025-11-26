@@ -1,0 +1,387 @@
+// js/form-renderer.js
+// Dynamic form renderer using Handsontable
+
+let hotInstance = null;
+
+// Initialize Handsontable with template schema
+export function initializeForm(containerId, template, responseData, options = {}) {
+  const container = document.getElementById(containerId);
+  if (!container) {
+    console.error(`Container ${containerId} not found`);
+    return null;
+  }
+
+  const { readOnly = false, onDataChange = null } = options;
+  const helpDisplay = template.helpDisplay || 'tooltip';
+
+  // Build columns configuration
+  const columns = buildColumns(template, helpDisplay, readOnly);
+  
+  // Build data array from template fields
+  const data = buildDataArray(template.fields, responseData);
+
+  // Destroy existing instance
+  if (hotInstance) {
+    hotInstance.destroy();
+  }
+
+  // Create Handsontable instance
+  hotInstance = new Handsontable(container, {
+    data: data,
+    columns: columns,
+    colHeaders: buildColHeaders(helpDisplay),
+    rowHeaders: true,
+    height: 'auto',
+    licenseKey: 'non-commercial-and-evaluation',
+    stretchH: 'all',
+    autoWrapRow: true,
+    wordWrap: true,
+    manualRowResize: true,
+    manualColumnResize: true,
+    contextMenu: false,
+    readOnly: readOnly,
+    cells: function(row, col, prop) {
+      const cellProperties = {};
+      // Make label and help columns read-only
+      if (prop === 'label' || prop === 'help') {
+        cellProperties.readOnly = true;
+        cellProperties.className = 'htDimmed';
+      }
+      return cellProperties;
+    },
+    afterChange: function(changes, source) {
+      if (source !== 'loadData' && onDataChange) {
+        const currentData = extractResponseData(template.fields);
+        onDataChange(currentData);
+      }
+    }
+  });
+
+  return hotInstance;
+}
+
+// Build column configuration based on template
+function buildColumns(template, helpDisplay, readOnly) {
+  const columns = [
+    {
+      data: 'label',
+      readOnly: true,
+      width: 250,
+      renderer: labelRenderer
+    }
+  ];
+
+  // Add help column based on display mode
+  if (helpDisplay === 'column') {
+    columns.push({
+      data: 'help',
+      readOnly: true,
+      width: 200,
+      renderer: helpColumnRenderer
+    });
+  }
+
+  // Answer column with dynamic cell types
+  columns.push({
+    data: 'answer',
+    width: 200,
+    renderer: answerRenderer,
+    editor: false // We use custom rendering
+  });
+
+  // Notes column
+  columns.push({
+    data: 'note',
+    width: 150,
+    type: 'text'
+  });
+
+  return columns;
+}
+
+// Build column headers
+function buildColHeaders(helpDisplay) {
+  const headers = ['Question'];
+  if (helpDisplay === 'column') {
+    headers.push('Help');
+  }
+  headers.push('Answer', 'Notes');
+  return headers;
+}
+
+// Build data array from template fields
+function buildDataArray(fields, responseData = {}) {
+  return fields.map(field => ({
+    fieldId: field.id,
+    label: field.label,
+    help: field.help || '',
+    type: field.type,
+    options: field.options || [],
+    required: field.required,
+    answer: responseData[field.id] ?? field.defaultValue ?? '',
+    note: responseData[`${field.id}_note`] ?? ''
+  }));
+}
+
+// Custom renderer for label column (with tooltip help)
+function labelRenderer(instance, td, row, col, prop, value, cellProperties) {
+  Handsontable.renderers.TextRenderer.apply(this, arguments);
+  
+  const rowData = instance.getSourceDataAtRow(row);
+  td.innerHTML = '';
+  
+  // Create label text
+  const labelSpan = document.createElement('span');
+  labelSpan.textContent = value;
+  if (rowData.required) {
+    labelSpan.innerHTML += ' <span class="text-danger">*</span>';
+  }
+  td.appendChild(labelSpan);
+  
+  // Add help icon if help text exists and not using column display
+  const template = window.currentTemplate;
+  if (rowData.help && template?.helpDisplay !== 'column') {
+    const helpIcon = document.createElement('span');
+    helpIcon.className = 'help-icon ms-2';
+    helpIcon.innerHTML = 'ⓘ';
+    helpIcon.title = rowData.help;
+    helpIcon.style.cursor = 'pointer';
+    helpIcon.style.color = '#6c757d';
+    
+    // Toggle tooltip on click
+    helpIcon.onclick = (e) => {
+      e.stopPropagation();
+      showHelpTooltip(helpIcon, rowData.help);
+    };
+    
+    td.appendChild(helpIcon);
+  }
+  
+  td.style.whiteSpace = 'normal';
+  td.style.verticalAlign = 'top';
+  td.style.padding = '8px';
+}
+
+// Custom renderer for help column
+function helpColumnRenderer(instance, td, row, col, prop, value, cellProperties) {
+  td.innerHTML = '';
+  td.style.whiteSpace = 'normal';
+  td.style.fontSize = '0.85em';
+  td.style.color = '#6c757d';
+  td.style.padding = '8px';
+  td.textContent = value || '';
+}
+
+// Custom renderer for answer column
+function answerRenderer(instance, td, row, col, prop, value, cellProperties) {
+  td.innerHTML = '';
+  td.style.padding = '4px';
+  
+  const rowData = instance.getSourceDataAtRow(row);
+  const isReadOnly = instance.getSettings().readOnly;
+  
+  let input;
+  
+  switch (rowData.type) {
+    case 'dropdown':
+      input = document.createElement('select');
+      input.className = 'form-select form-select-sm';
+      input.disabled = isReadOnly;
+      
+      // Add empty option
+      const emptyOpt = document.createElement('option');
+      emptyOpt.value = '';
+      emptyOpt.textContent = '-- Select --';
+      input.appendChild(emptyOpt);
+      
+      // Add options
+      rowData.options.forEach(opt => {
+        const option = document.createElement('option');
+        option.value = opt;
+        option.textContent = opt;
+        if (opt === value) option.selected = true;
+        input.appendChild(option);
+      });
+      
+      input.onchange = () => {
+        instance.setDataAtRowProp(row, 'answer', input.value);
+      };
+      break;
+      
+    case 'radio':
+      input = document.createElement('div');
+      input.className = 'd-flex flex-wrap gap-2';
+      
+      rowData.options.forEach((opt, idx) => {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'form-check form-check-inline';
+        
+        const radio = document.createElement('input');
+        radio.type = 'radio';
+        radio.className = 'form-check-input';
+        radio.name = `radio_${rowData.fieldId}`;
+        radio.id = `radio_${rowData.fieldId}_${idx}`;
+        radio.value = opt;
+        radio.checked = opt === value;
+        radio.disabled = isReadOnly;
+        
+        radio.onchange = () => {
+          instance.setDataAtRowProp(row, 'answer', opt);
+        };
+        
+        const label = document.createElement('label');
+        label.className = 'form-check-label';
+        label.htmlFor = radio.id;
+        label.textContent = opt;
+        
+        wrapper.appendChild(radio);
+        wrapper.appendChild(label);
+        input.appendChild(wrapper);
+      });
+      break;
+      
+    case 'textarea':
+      input = document.createElement('textarea');
+      input.className = 'form-control form-control-sm';
+      input.rows = 2;
+      input.value = value || '';
+      input.disabled = isReadOnly;
+      
+      input.onchange = () => {
+        instance.setDataAtRowProp(row, 'answer', input.value);
+      };
+      break;
+      
+    case 'number':
+      input = document.createElement('input');
+      input.type = 'number';
+      input.className = 'form-control form-control-sm';
+      input.value = value || '';
+      input.disabled = isReadOnly;
+      
+      input.onchange = () => {
+        instance.setDataAtRowProp(row, 'answer', input.value);
+      };
+      break;
+      
+    case 'date':
+      input = document.createElement('input');
+      input.type = 'date';
+      input.className = 'form-control form-control-sm';
+      input.value = value || '';
+      input.disabled = isReadOnly;
+      
+      input.onchange = () => {
+        instance.setDataAtRowProp(row, 'answer', input.value);
+      };
+      break;
+      
+    case 'text':
+    default:
+      input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'form-control form-control-sm';
+      input.value = value || '';
+      input.disabled = isReadOnly;
+      
+      input.onchange = () => {
+        instance.setDataAtRowProp(row, 'answer', input.value);
+      };
+      break;
+  }
+  
+  td.appendChild(input);
+}
+
+// Show help tooltip
+function showHelpTooltip(element, text) {
+  // Remove existing tooltips
+  document.querySelectorAll('.help-tooltip').forEach(t => t.remove());
+  
+  const tooltip = document.createElement('div');
+  tooltip.className = 'help-tooltip';
+  tooltip.textContent = text;
+  tooltip.style.cssText = `
+    position: absolute;
+    background: #333;
+    color: white;
+    padding: 8px 12px;
+    border-radius: 4px;
+    max-width: 300px;
+    z-index: 1000;
+    font-size: 0.85em;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  `;
+  
+  document.body.appendChild(tooltip);
+  
+  // Position tooltip
+  const rect = element.getBoundingClientRect();
+  tooltip.style.top = `${rect.bottom + window.scrollY + 5}px`;
+  tooltip.style.left = `${rect.left + window.scrollX}px`;
+  
+  // Close on click outside
+  setTimeout(() => {
+    document.addEventListener('click', function closeTooltip(e) {
+      if (!tooltip.contains(e.target)) {
+        tooltip.remove();
+        document.removeEventListener('click', closeTooltip);
+      }
+    });
+  }, 100);
+}
+
+// Extract response data from Handsontable
+export function extractResponseData(fields) {
+  if (!hotInstance) return {};
+  
+  const data = {};
+  const sourceData = hotInstance.getSourceData();
+  
+  sourceData.forEach((row, index) => {
+    const fieldId = row.fieldId;
+    data[fieldId] = row.answer;
+    if (row.note) {
+      data[`${fieldId}_note`] = row.note;
+    }
+  });
+  
+  return data;
+}
+
+// Validate required fields
+export function validateForm(fields) {
+  if (!hotInstance) return { valid: true, errors: [] };
+  
+  const errors = [];
+  const sourceData = hotInstance.getSourceData();
+  
+  sourceData.forEach((row, index) => {
+    if (row.required && !row.answer) {
+      errors.push({
+        row: index + 1,
+        fieldId: row.fieldId,
+        label: row.label,
+        message: 'This field is required'
+      });
+    }
+  });
+  
+  return {
+    valid: errors.length === 0,
+    errors: errors
+  };
+}
+
+// Get Handsontable instance
+export function getHotInstance() {
+  return hotInstance;
+}
+
+// Destroy instance
+export function destroyForm() {
+  if (hotInstance) {
+    hotInstance.destroy();
+    hotInstance = null;
+  }
+}

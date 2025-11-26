@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Panel - Data Collection App</title>
+  
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Custom CSS -->
+  <link href="css/styles.css" rel="stylesheet">
+</head>
+<body>
+  <!-- Navigation -->
+  <nav class="navbar navbar-dark navbar-expand-lg">
+    <div class="container-fluid">
+      <a class="navbar-brand" href="index.html">📊 Data Collection App</a>
+      <div class="navbar-nav ms-auto">
+        <span id="userDisplay" class="navbar-text text-light"></span>
+        <button id="logoutBtn" class="btn btn-outline-light btn-sm ms-3">Sign Out</button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Sign In (shown when not authenticated) -->
+  <div id="signInSection" class="d-none">
+    <div class="container mt-5">
+      <div class="row justify-content-center">
+        <div class="col-md-5">
+          <div class="card">
+            <div class="card-header">
+              <h5 class="mb-0">Admin Sign In</h5>
+            </div>
+            <div class="card-body">
+              <div id="signInError" class="alert alert-danger d-none"></div>
+              <form id="signInForm">
+                <div class="mb-3">
+                  <label for="email" class="form-label">Email address</label>
+                  <input type="email" class="form-control" id="email" required>
+                </div>
+                <div class="mb-3">
+                  <label for="password" class="form-label">Password</label>
+                  <input type="password" class="form-control" id="password" required>
+                </div>
+                <button type="submit" class="btn btn-primary w-100">Sign In</button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Admin Panel (shown when authenticated as admin) -->
+  <div id="adminPanel" class="d-none">
+    <div class="container-fluid">
+      <div class="row">
+        <!-- Sidebar -->
+        <div class="col-md-2 admin-sidebar p-0">
+          <nav class="mt-3">
+            <a href="#" class="admin-nav-link active" data-section="users">👥 Users</a>
+            <a href="#" class="admin-nav-link" data-section="templates">📋 Templates</a>
+            <a href="#" class="admin-nav-link" data-section="responses">📊 Responses</a>
+          </nav>
+        </div>
+        
+        <!-- Main Content -->
+        <div class="col-md-10 p-4">
+          <!-- Users Section -->
+          <div id="usersSection" class="admin-section">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+              <h4>User Management</h4>
+              <div>
+                <button id="addUserBtn" class="btn btn-primary btn-sm me-2">+ Add User</button>
+                <button id="uploadUsersBtn" class="btn btn-outline-primary btn-sm">↑ Upload CSV</button>
+              </div>
+            </div>
+            
+            <div class="card">
+              <div class="card-body">
+                <div id="usersTable" class="table-container">
+                  <table class="table table-hover data-table">
+                    <thead>
+                      <tr>
+                        <th>Email</th>
+                        <th>Role</th>
+                        <th>Assigned Jobs</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody id="usersTableBody">
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Templates Section -->
+          <div id="templatesSection" class="admin-section d-none">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+              <h4>Template Management</h4>
+              <button id="uploadTemplateBtn" class="btn btn-primary btn-sm">+ Upload Template CSV</button>
+            </div>
+            
+            <div class="card">
+              <div class="card-body">
+                <div id="templatesTable" class="table-container">
+                  <table class="table table-hover data-table">
+                    <thead>
+                      <tr>
+                        <th>Job ID</th>
+                        <th>Title</th>
+                        <th>Fields</th>
+                        <th>Version</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody id="templatesTableBody">
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Responses Section -->
+          <div id="responsesSection" class="admin-section d-none">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+              <h4>Response Viewer</h4>
+              <div>
+                <select id="filterJob" class="form-select form-select-sm d-inline-block w-auto me-2">
+                  <option value="">All Jobs</option>
+                </select>
+                <select id="filterStatus" class="form-select form-select-sm d-inline-block w-auto me-2">
+                  <option value="">All Status</option>
+                  <option value="draft">Draft</option>
+                  <option value="submitted">Submitted</option>
+                </select>
+                <button id="exportCsvBtn" class="btn btn-outline-primary btn-sm">↓ Export CSV</button>
+              </div>
+            </div>
+            
+            <div class="card">
+              <div class="card-body">
+                <div id="responsesTable" class="table-container">
+                  <table class="table table-hover data-table">
+                    <thead>
+                      <tr>
+                        <th>User</th>
+                        <th>Job</th>
+                        <th>Status</th>
+                        <th>Updated</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody id="responsesTableBody">
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add User Modal -->
+  <div class="modal fade" id="addUserModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Add New User</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <form id="addUserForm">
+            <div class="mb-3">
+              <label class="form-label">Email</label>
+              <input type="email" class="form-control" id="newUserEmail" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Role</label>
+              <select class="form-select" id="newUserRole">
+                <option value="coder">Coder (Research Assistant)</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Assigned Jobs (comma-separated)</label>
+              <input type="text" class="form-control" id="newUserJobs" placeholder="referendum-2024, initiative-2024">
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-primary" id="saveUserBtn">Create User</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Upload Users CSV Modal -->
+  <div class="modal fade" id="uploadUsersModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Upload Users CSV</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted">CSV format: email,role,assigned_jobs</p>
+          <p class="text-muted small">Example: john@example.com,coder,"referendum-2024|initiative-2024"</p>
+          <div class="file-upload-zone" id="usersDropZone">
+            <input type="file" id="usersFileInput" accept=".csv" style="display: none">
+            <p class="mb-0">📁 Click or drag CSV file here</p>
+          </div>
+          <div id="usersPreview" class="mt-3 d-none">
+            <h6>Preview:</h6>
+            <div id="usersPreviewContent"></div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-primary d-none" id="confirmUsersUpload">Upload Users</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Upload Template Modal -->
+  <div class="modal fade" id="uploadTemplateModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Upload Template CSV</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row mb-3">
+            <div class="col-md-6">
+              <label class="form-label">Job ID</label>
+              <input type="text" class="form-control" id="templateJobId" placeholder="referendum-2024" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Title</label>
+              <input type="text" class="form-control" id="templateTitle" placeholder="Referendum Analysis 2024" required>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Description</label>
+            <textarea class="form-control" id="templateDescription" rows="2" placeholder="Optional description"></textarea>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Help Display Mode</label>
+            <select class="form-select" id="templateHelpDisplay">
+              <option value="tooltip">Tooltip (icon click)</option>
+              <option value="column">Column (always visible)</option>
+              <option value="inline">Inline (expandable)</option>
+            </select>
+          </div>
+          <hr>
+          <p class="text-muted small">CSV columns: field_id, field_type, label, help_text, required, options, default_value, skip_to_if_no</p>
+          <div class="file-upload-zone" id="templateDropZone">
+            <input type="file" id="templateFileInput" accept=".csv" style="display: none">
+            <p class="mb-0">📁 Click or drag template CSV file here</p>
+          </div>
+          <div id="templatePreview" class="mt-3 d-none">
+            <h6>Fields Preview:</h6>
+            <div id="templatePreviewContent" style="max-height: 200px; overflow-y: auto;"></div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-primary d-none" id="confirmTemplateUpload">Create Template</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- View Response Modal -->
+  <div class="modal fade" id="viewResponseModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Response Details</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div id="responseDetail" class="response-detail"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- PapaParse for CSV -->
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  
+  <!-- Admin App Script -->
+  <script type="module">
+    import { signIn, logOut, onAuthChange, getUserRole } from './js/auth.js';
+    import { 
+      createUser, getAllUsers, updateUser, createUsersFromCSV,
+      createTemplate, getTemplate, getAllTemplates,
+      getAllResponses, getJobResponses, responsesToCSV
+    } from './js/firestore-service.js';
+    import { parseCSV, createTemplateSchema, validateTemplateSchema, getExampleCSV } from './js/template-parser.js';
+
+    // State
+    let currentUser = null;
+    let allUsers = [];
+    let allTemplates = [];
+    let allResponses = [];
+    let parsedUsersCSV = null;
+    let parsedTemplateCSV = null;
+
+    // DOM Elements
+    const signInSection = document.getElementById('signInSection');
+    const adminPanel = document.getElementById('adminPanel');
+    const signInForm = document.getElementById('signInForm');
+    const signInError = document.getElementById('signInError');
+    const userDisplay = document.getElementById('userDisplay');
+
+    // Auth state listener
+    onAuthChange(async (user) => {
+      currentUser = user;
+      if (user) {
+        const role = await getUserRole(user.email);
+        if (role === 'admin') {
+          showAdminPanel();
+        } else {
+          alert('Access denied. Admin role required.');
+          await logOut();
+        }
+      } else {
+        showSignIn();
+      }
+    });
+
+    // Sign in
+    signInForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      
+      const result = await signIn(email, password);
+      if (!result.success) {
+        signInError.textContent = result.error;
+        signInError.classList.remove('d-none');
+      }
+    });
+
+    // Logout
+    document.getElementById('logoutBtn').addEventListener('click', async () => {
+      await logOut();
+    });
+
+    // Navigation
+    document.querySelectorAll('.admin-nav-link').forEach(link => {
+      link.addEventListener('click', (e) => {
+        e.preventDefault();
+        const section = link.dataset.section;
+        
+        // Update active state
+        document.querySelectorAll('.admin-nav-link').forEach(l => l.classList.remove('active'));
+        link.classList.add('active');
+        
+        // Show section
+        document.querySelectorAll('.admin-section').forEach(s => s.classList.add('d-none'));
+        document.getElementById(`${section}Section`).classList.remove('d-none');
+        
+        // Load data
+        if (section === 'users') loadUsers();
+        if (section === 'templates') loadTemplates();
+        if (section === 'responses') loadResponses();
+      });
+    });
+
+    function showSignIn() {
+      signInSection.classList.remove('d-none');
+      adminPanel.classList.add('d-none');
+    }
+
+    function showAdminPanel() {
+      signInSection.classList.add('d-none');
+      adminPanel.classList.remove('d-none');
+      userDisplay.textContent = currentUser.email;
+      loadUsers();
+    }
+
+    // ============================================================
+    // USERS MANAGEMENT
+    // ============================================================
+
+    async function loadUsers() {
+      const tbody = document.getElementById('usersTableBody');
+      tbody.innerHTML = '<tr><td colspan="5" class="text-center">Loading...</td></tr>';
+      
+      try {
+        allUsers = await getAllUsers();
+        
+        if (allUsers.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No users found</td></tr>';
+          return;
+        }
+        
+        tbody.innerHTML = allUsers.map(user => `
+          <tr>
+            <td>${user.email}</td>
+            <td><span class="badge bg-${user.role === 'admin' ? 'primary' : 'secondary'}">${user.role}</span></td>
+            <td>${(user.assignedJobs || []).join(', ') || '-'}</td>
+            <td><span class="badge bg-${user.status === 'active' ? 'success' : 'warning'}">${user.status || 'active'}</span></td>
+            <td>
+              <button class="btn btn-sm btn-outline-secondary edit-user-btn" data-email="${user.email}">Edit</button>
+            </td>
+          </tr>
+        `).join('');
+        
+      } catch (error) {
+        console.error('Error loading users:', error);
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger">Error loading users</td></tr>';
+      }
+    }
+
+    // Add user modal
+    document.getElementById('addUserBtn').addEventListener('click', () => {
+      new bootstrap.Modal(document.getElementById('addUserModal')).show();
+    });
+
+    // Save new user
+    document.getElementById('saveUserBtn').addEventListener('click', async () => {
+      const email = document.getElementById('newUserEmail').value;
+      const role = document.getElementById('newUserRole').value;
+      const jobsStr = document.getElementById('newUserJobs').value;
+      const assignedJobs = jobsStr ? jobsStr.split(',').map(j => j.trim()) : [];
+      
+      try {
+        await createUser(email, { role, assignedJobs });
+        bootstrap.Modal.getInstance(document.getElementById('addUserModal')).hide();
+        document.getElementById('addUserForm').reset();
+        loadUsers();
+        alert('User created successfully!');
+      } catch (error) {
+        alert('Error creating user: ' + error.message);
+      }
+    });
+
+    // Upload users CSV
+    document.getElementById('uploadUsersBtn').addEventListener('click', () => {
+      new bootstrap.Modal(document.getElementById('uploadUsersModal')).show();
+    });
+
+    // Users file upload zone
+    const usersDropZone = document.getElementById('usersDropZone');
+    const usersFileInput = document.getElementById('usersFileInput');
+
+    usersDropZone.addEventListener('click', () => usersFileInput.click());
+    usersDropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      usersDropZone.classList.add('drag-over');
+    });
+    usersDropZone.addEventListener('dragleave', () => {
+      usersDropZone.classList.remove('drag-over');
+    });
+    usersDropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      usersDropZone.classList.remove('drag-over');
+      handleUsersFile(e.dataTransfer.files[0]);
+    });
+    usersFileInput.addEventListener('change', (e) => {
+      handleUsersFile(e.target.files[0]);
+    });
+
+    function handleUsersFile(file) {
+      if (!file) return;
+      
+      Papa.parse(file, {
+        header: true,
+        complete: (results) => {
+          parsedUsersCSV = results.data.filter(row => row.email);
+          
+          const preview = document.getElementById('usersPreview');
+          const content = document.getElementById('usersPreviewContent');
+          
+          content.innerHTML = `<p>${parsedUsersCSV.length} users found</p>
+            <ul class="small">${parsedUsersCSV.slice(0, 5).map(u => `<li>${u.email} (${u.role || 'coder'})</li>`).join('')}</ul>
+            ${parsedUsersCSV.length > 5 ? '<p class="small text-muted">...and more</p>' : ''}`;
+          
+          preview.classList.remove('d-none');
+          document.getElementById('confirmUsersUpload').classList.remove('d-none');
+        },
+        error: (error) => {
+          alert('Error parsing CSV: ' + error.message);
+        }
+      });
+    }
+
+    document.getElementById('confirmUsersUpload').addEventListener('click', async () => {
+      if (!parsedUsersCSV) return;
+      
+      const usersData = parsedUsersCSV.map(row => ({
+        email: row.email,
+        role: row.role || 'coder',
+        assignedJobs: row.assigned_jobs ? row.assigned_jobs.split('|').map(j => j.trim()) : []
+      }));
+      
+      try {
+        const result = await createUsersFromCSV(usersData);
+        bootstrap.Modal.getInstance(document.getElementById('uploadUsersModal')).hide();
+        loadUsers();
+        alert(`Created ${result.created} users!`);
+      } catch (error) {
+        alert('Error uploading users: ' + error.message);
+      }
+    });
+
+    // ============================================================
+    // TEMPLATES MANAGEMENT
+    // ============================================================
+
+    async function loadTemplates() {
+      const tbody = document.getElementById('templatesTableBody');
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center">Loading...</td></tr>';
+      
+      try {
+        allTemplates = await getAllTemplates();
+        
+        if (allTemplates.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No templates found</td></tr>';
+          return;
+        }
+        
+        tbody.innerHTML = allTemplates.map(template => `
+          <tr>
+            <td><code>${template.jobId}</code></td>
+            <td>${template.title}</td>
+            <td>${template.fields?.length || 0}</td>
+            <td>v${template.version || 1}</td>
+            <td><span class="badge bg-${template.status === 'active' ? 'success' : 'secondary'}">${template.status}</span></td>
+            <td>
+              <button class="btn btn-sm btn-outline-secondary view-template-btn" data-job-id="${template.jobId}">View</button>
+            </td>
+          </tr>
+        `).join('');
+        
+        // Update job filter in responses section
+        const filterJob = document.getElementById('filterJob');
+        filterJob.innerHTML = '<option value="">All Jobs</option>' + 
+          allTemplates.map(t => `<option value="${t.jobId}">${t.title}</option>`).join('');
+        
+      } catch (error) {
+        console.error('Error loading templates:', error);
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error loading templates</td></tr>';
+      }
+    }
+
+    // Upload template
+    document.getElementById('uploadTemplateBtn').addEventListener('click', () => {
+      new bootstrap.Modal(document.getElementById('uploadTemplateModal')).show();
+    });
+
+    // Template file upload zone
+    const templateDropZone = document.getElementById('templateDropZone');
+    const templateFileInput = document.getElementById('templateFileInput');
+
+    templateDropZone.addEventListener('click', () => templateFileInput.click());
+    templateDropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      templateDropZone.classList.add('drag-over');
+    });
+    templateDropZone.addEventListener('dragleave', () => {
+      templateDropZone.classList.remove('drag-over');
+    });
+    templateDropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      templateDropZone.classList.remove('drag-over');
+      handleTemplateFile(e.dataTransfer.files[0]);
+    });
+    templateFileInput.addEventListener('change', (e) => {
+      handleTemplateFile(e.target.files[0]);
+    });
+
+    function handleTemplateFile(file) {
+      if (!file) return;
+      
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          parsedTemplateCSV = parseCSV(e.target.result);
+          
+          const preview = document.getElementById('templatePreview');
+          const content = document.getElementById('templatePreviewContent');
+          
+          content.innerHTML = `<table class="table table-sm">
+            <thead><tr><th>ID</th><th>Type</th><th>Label</th></tr></thead>
+            <tbody>
+              ${parsedTemplateCSV.map(f => `<tr><td><code>${f.id}</code></td><td>${f.type}</td><td>${f.label.substring(0, 40)}${f.label.length > 40 ? '...' : ''}</td></tr>`).join('')}
+            </tbody>
+          </table>`;
+          
+          preview.classList.remove('d-none');
+          document.getElementById('confirmTemplateUpload').classList.remove('d-none');
+        } catch (error) {
+          alert('Error parsing template CSV: ' + error.message);
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    document.getElementById('confirmTemplateUpload').addEventListener('click', async () => {
+      if (!parsedTemplateCSV) return;
+      
+      const jobId = document.getElementById('templateJobId').value.trim();
+      const title = document.getElementById('templateTitle').value.trim();
+      const description = document.getElementById('templateDescription').value.trim();
+      const helpDisplay = document.getElementById('templateHelpDisplay').value;
+      
+      if (!jobId || !title) {
+        alert('Job ID and Title are required');
+        return;
+      }
+      
+      const schema = createTemplateSchema(jobId, title, description, parsedTemplateCSV, helpDisplay);
+      const validation = validateTemplateSchema(schema);
+      
+      if (!validation.valid) {
+        alert('Validation errors:\n' + validation.errors.join('\n'));
+        return;
+      }
+      
+      try {
+        await createTemplate(schema, currentUser.email);
+        bootstrap.Modal.getInstance(document.getElementById('uploadTemplateModal')).hide();
+        
+        // Reset form
+        document.getElementById('templateJobId').value = '';
+        document.getElementById('templateTitle').value = '';
+        document.getElementById('templateDescription').value = '';
+        document.getElementById('templatePreview').classList.add('d-none');
+        document.getElementById('confirmTemplateUpload').classList.add('d-none');
+        parsedTemplateCSV = null;
+        
+        loadTemplates();
+        alert('Template created successfully!');
+      } catch (error) {
+        alert('Error creating template: ' + error.message);
+      }
+    });
+
+    // ============================================================
+    // RESPONSES MANAGEMENT
+    // ============================================================
+
+    async function loadResponses() {
+      const tbody = document.getElementById('responsesTableBody');
+      tbody.innerHTML = '<tr><td colspan="5" class="text-center">Loading...</td></tr>';
+      
+      try {
+        allResponses = await getAllResponses();
+        
+        // Apply filters
+        const jobFilter = document.getElementById('filterJob').value;
+        const statusFilter = document.getElementById('filterStatus').value;
+        
+        let filtered = allResponses;
+        if (jobFilter) filtered = filtered.filter(r => r.jobId === jobFilter);
+        if (statusFilter) filtered = filtered.filter(r => r.status === statusFilter);
+        
+        if (filtered.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No responses found</td></tr>';
+          return;
+        }
+        
+        tbody.innerHTML = filtered.map(response => `
+          <tr>
+            <td>${response.userEmail}</td>
+            <td><code>${response.jobId}</code></td>
+            <td><span class="badge badge-${response.status}">${response.status}</span></td>
+            <td>${formatDate(response.updatedAt)}</td>
+            <td>
+              <button class="btn btn-sm btn-outline-secondary view-response-btn" data-response-id="${response.responseId}">View</button>
+            </td>
+          </tr>
+        `).join('');
+        
+        // Add click handlers
+        document.querySelectorAll('.view-response-btn').forEach(btn => {
+          btn.addEventListener('click', () => viewResponse(btn.dataset.responseId));
+        });
+        
+      } catch (error) {
+        console.error('Error loading responses:', error);
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger">Error loading responses</td></tr>';
+      }
+    }
+
+    // Filters
+    document.getElementById('filterJob').addEventListener('change', loadResponses);
+    document.getElementById('filterStatus').addEventListener('change', loadResponses);
+
+    // View response
+    async function viewResponse(responseId) {
+      const response = allResponses.find(r => r.responseId === responseId);
+      if (!response) return;
+      
+      const template = await getTemplate(response.jobId);
+      
+      const detail = document.getElementById('responseDetail');
+      detail.innerHTML = `
+        <p><strong>Response ID:</strong> ${response.responseId}</p>
+        <p><strong>User:</strong> ${response.userEmail}</p>
+        <p><strong>Job:</strong> ${response.jobId}</p>
+        <p><strong>Status:</strong> <span class="badge badge-${response.status}">${response.status}</span></p>
+        <hr>
+        ${template?.fields?.map(field => `
+          <div class="response-field">
+            <div class="response-field-label">${field.label}</div>
+            <div class="response-field-value">${response.data?.[field.id] || '<em class="text-muted">No answer</em>'}</div>
+            ${response.data?.[`${field.id}_note`] ? `<div class="small text-muted mt-1">Note: ${response.data[`${field.id}_note`]}</div>` : ''}
+          </div>
+        `).join('') || '<p class="text-muted">No template found</p>'}
+      `;
+      
+      new bootstrap.Modal(document.getElementById('viewResponseModal')).show();
+    }
+
+    // Export CSV
+    document.getElementById('exportCsvBtn').addEventListener('click', async () => {
+      const jobFilter = document.getElementById('filterJob').value;
+      
+      if (!jobFilter) {
+        alert('Please select a job to export');
+        return;
+      }
+      
+      const template = await getTemplate(jobFilter);
+      const responses = allResponses.filter(r => r.jobId === jobFilter && r.status === 'submitted');
+      
+      if (responses.length === 0) {
+        alert('No submitted responses to export');
+        return;
+      }
+      
+      const csv = responsesToCSV(responses, template);
+      downloadCSV(csv, `${jobFilter}_responses.csv`);
+    });
+
+    function downloadCSV(content, filename) {
+      const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = filename;
+      link.click();
+    }
+
+    function formatDate(timestamp) {
+      if (!timestamp) return '-';
+      const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+      return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+  </script>
+</body>
+</html>

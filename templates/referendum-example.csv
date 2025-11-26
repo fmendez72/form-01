@@ -1,0 +1,9 @@
+field_id,field_type,label,help_text,required,options,default_value,skip_to_if_no
+q1,dropdown,Is there a referendum provision?,"A referendum is a direct vote by citizens on a specific issue, law, or constitutional amendment.",yes,"Yes|No|Unknown",,q8
+q2,dropdown,Type of referendum,"Select the primary type of referendum mechanism available in this jurisdiction.",yes,"Mandatory|Optional|Citizen-initiated|Ad hoc",,
+q3,number,Signature threshold (%),"Percentage of registered voters required to trigger a citizen-initiated referendum. Enter as whole number (e.g., 5 for 5%).",no,,,
+q4,radio,Constitutional basis?,"Is the referendum mechanism explicitly mentioned in the national constitution?",yes,"Yes|No",,
+q5,text,Relevant legal provision,"Citation of the constitutional article or law (e.g., Art. 75 Constitution, Referendum Act 2010).",no,,,
+q6,textarea,Brief description,"Summarize the referendum mechanism in 2-3 sentences. Include key features and any notable restrictions.",no,,,
+q7,date,Date of adoption,"When was this referendum provision first enacted or adopted?",no,,,
+q8,textarea,Additional notes,"Any other relevant observations, recent developments, or context about this country's referendum system.",no,,,

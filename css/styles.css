@@ -1,0 +1,291 @@
+/* css/styles.css */
+/* Custom styles for Political Data Collection App */
+
+:root {
+  --primary-color: #2c5282;
+  --secondary-color: #4a5568;
+  --success-color: #38a169;
+  --warning-color: #d69e2e;
+  --danger-color: #e53e3e;
+  --light-bg: #f7fafc;
+  --border-color: #e2e8f0;
+}
+
+/* General Layout */
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  background-color: var(--light-bg);
+  min-height: 100vh;
+}
+
+.app-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+/* Navigation */
+.navbar {
+  background-color: var(--primary-color) !important;
+}
+
+.navbar-brand {
+  font-weight: 600;
+}
+
+/* Cards */
+.card {
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.card-header {
+  background-color: white;
+  border-bottom: 1px solid var(--border-color);
+  font-weight: 600;
+}
+
+/* Forms */
+.form-label {
+  font-weight: 500;
+  color: var(--secondary-color);
+}
+
+.form-control:focus,
+.form-select:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 0.2rem rgba(44, 82, 130, 0.25);
+}
+
+/* Buttons */
+.btn-primary {
+  background-color: var(--primary-color);
+  border-color: var(--primary-color);
+}
+
+.btn-primary:hover {
+  background-color: #234876;
+  border-color: #234876;
+}
+
+/* Status Badges */
+.badge-draft {
+  background-color: var(--warning-color);
+  color: white;
+}
+
+.badge-submitted {
+  background-color: var(--success-color);
+  color: white;
+}
+
+.badge-new {
+  background-color: var(--secondary-color);
+  color: white;
+}
+
+/* Handsontable Customization */
+.handsontable {
+  font-size: 14px;
+}
+
+.handsontable th {
+  background-color: var(--light-bg) !important;
+  font-weight: 600;
+}
+
+.handsontable td {
+  vertical-align: middle !important;
+}
+
+.handsontable .htDimmed {
+  background-color: #fafafa;
+}
+
+/* Help Icon */
+.help-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background-color: #e2e8f0;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.help-icon:hover {
+  background-color: #cbd5e0;
+}
+
+/* Help Tooltip */
+.help-tooltip {
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Job Cards */
+.job-card {
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.job-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Data Tables */
+.table-container {
+  overflow-x: auto;
+}
+
+.data-table {
+  font-size: 14px;
+}
+
+.data-table th {
+  background-color: var(--light-bg);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.data-table tr:hover {
+  background-color: #f0f4f8;
+}
+
+/* Loading States */
+.loading-spinner {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 40px;
+}
+
+/* Alert Messages */
+.alert {
+  border-radius: 8px;
+}
+
+/* Progress Indicator */
+.progress-indicator {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+}
+
+.progress-text {
+  font-size: 14px;
+  color: var(--secondary-color);
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+  .app-container {
+    padding: 10px;
+  }
+  
+  .card {
+    margin-bottom: 15px;
+  }
+}
+
+/* Admin Panel Specific */
+.admin-sidebar {
+  background-color: white;
+  border-right: 1px solid var(--border-color);
+  min-height: calc(100vh - 56px);
+}
+
+.admin-nav-link {
+  color: var(--secondary-color);
+  padding: 12px 20px;
+  display: block;
+  text-decoration: none;
+  border-left: 3px solid transparent;
+}
+
+.admin-nav-link:hover,
+.admin-nav-link.active {
+  background-color: var(--light-bg);
+  border-left-color: var(--primary-color);
+  color: var(--primary-color);
+}
+
+/* File Upload */
+.file-upload-zone {
+  border: 2px dashed var(--border-color);
+  border-radius: 8px;
+  padding: 40px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+.file-upload-zone:hover {
+  border-color: var(--primary-color);
+  background-color: #f0f4f8;
+}
+
+.file-upload-zone.drag-over {
+  border-color: var(--primary-color);
+  background-color: #ebf8ff;
+}
+
+/* Modal Improvements */
+.modal-header {
+  background-color: var(--light-bg);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.modal-footer {
+  background-color: var(--light-bg);
+  border-top: 1px solid var(--border-color);
+}
+
+/* Response Viewer */
+.response-detail {
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.response-field {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.response-field:last-child {
+  border-bottom: none;
+}
+
+.response-field-label {
+  font-weight: 500;
+  color: var(--secondary-color);
+  font-size: 0.9em;
+}
+
+.response-field-value {
+  margin-top: 4px;
+}
+
+/* Empty States */
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--secondary-color);
+}
+
+.empty-state-icon {
+  font-size: 48px;
+  margin-bottom: 20px;
+  opacity: 0.5;
+}

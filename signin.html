@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign In - Data Collection App</title>
+  
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Handsontable CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/handsontable@14.1.0/dist/handsontable.full.min.css" rel="stylesheet">
+  <!-- Custom CSS -->
+  <link href="css/styles.css" rel="stylesheet">
+</head>
+<body>
+  <!-- Navigation -->
+  <nav class="navbar navbar-dark navbar-expand-lg">
+    <div class="container">
+      <a class="navbar-brand" href="index.html">📊 Data Collection App</a>
+      <div class="navbar-nav ms-auto">
+        <span id="userDisplay" class="navbar-text text-light d-none"></span>
+        <button id="logoutBtn" class="btn btn-outline-light btn-sm ms-3 d-none">Sign Out</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="app-container">
+    <!-- Sign In Form (shown when not authenticated) -->
+    <div id="signInSection" class="row justify-content-center mt-5">
+      <div class="col-md-5">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="mb-0">Research Assistant Sign In</h5>
+          </div>
+          <div class="card-body">
+            <div id="signInError" class="alert alert-danger d-none"></div>
+            <form id="signInForm">
+              <div class="mb-3">
+                <label for="email" class="form-label">Email address</label>
+                <input type="email" class="form-control" id="email" required>
+              </div>
+              <div class="mb-3">
+                <label for="password" class="form-label">Password</label>
+                <input type="password" class="form-control" id="password" required>
+              </div>
+              <button type="submit" class="btn btn-primary w-100">Sign In</button>
+            </form>
+            <div class="mt-3 text-center">
+              <a href="#" id="forgotPasswordLink" class="text-muted small">Forgot password?</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dashboard (shown when authenticated) -->
+    <div id="dashboardSection" class="d-none">
+      <h4 class="mb-4">Your Assigned Jobs</h4>
+      <div id="jobsList" class="row g-3">
+        <!-- Job cards will be populated here -->
+      </div>
+      <div id="noJobsMessage" class="empty-state d-none">
+        <div class="empty-state-icon">📋</div>
+        <h5>No Jobs Assigned</h5>
+        <p>You don't have any questionnaires assigned yet. Contact your administrator.</p>
+      </div>
+    </div>
+
+    <!-- Form Entry (shown when job selected) -->
+    <div id="formSection" class="d-none">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+          <button id="backToDashboard" class="btn btn-outline-secondary btn-sm">← Back to Jobs</button>
+        </div>
+        <div>
+          <h5 id="formTitle" class="mb-0"></h5>
+        </div>
+        <div>
+          <span id="formStatus" class="badge"></span>
+        </div>
+      </div>
+      
+      <div class="card mb-3">
+        <div class="card-body">
+          <p id="formDescription" class="text-muted mb-2"></p>
+          <div class="progress-indicator">
+            <div class="progress flex-grow-1" style="height: 8px;">
+              <div id="progressBar" class="progress-bar" role="progressbar" style="width: 0%"></div>
+            </div>
+            <span id="progressText" class="progress-text">0% complete</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-body p-0">
+          <div id="formContainer"></div>
+        </div>
+      </div>
+
+      <div class="d-flex justify-content-between mt-3">
+        <button id="saveDraftBtn" class="btn btn-outline-primary">
+          💾 Save Draft
+        </button>
+        <div>
+          <span id="lastSaved" class="text-muted small me-3"></span>
+          <button id="submitBtn" class="btn btn-success">
+            ✓ Submit Response
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- Handsontable JS -->
+  <script src="https://cdn.jsdelivr.net/npm/handsontable@14.1.0/dist/handsontable.full.min.js"></script>
+  
+  <!-- App Scripts -->
+  <script type="module">
+    import { signIn, logOut, onAuthChange, getUserData } from './js/auth.js';
+    import { getTemplate, getAllTemplates, getOrCreateResponse, updateResponseData, submitResponse } from './js/firestore-service.js';
+    import { initializeForm, extractResponseData, validateForm, destroyForm } from './js/form-renderer.js';
+
+    // State
+    let currentUser = null;
+    let currentUserData = null;
+    let currentJob = null;
+    let currentTemplate = null;
+    let currentResponse = null;
+    let autoSaveTimer = null;
+
+    // DOM Elements
+    const signInSection = document.getElementById('signInSection');
+    const dashboardSection = document.getElementById('dashboardSection');
+    const formSection = document.getElementById('formSection');
+    const signInForm = document.getElementById('signInForm');
+    const signInError = document.getElementById('signInError');
+    const userDisplay = document.getElementById('userDisplay');
+    const logoutBtn = document.getElementById('logoutBtn');
+    const jobsList = document.getElementById('jobsList');
+    const noJobsMessage = document.getElementById('noJobsMessage');
+
+    // Auth state listener
+    onAuthChange(async (user) => {
+      currentUser = user;
+      if (user) {
+        currentUserData = await getUserData(user.email);
+        if (currentUserData && currentUserData.role !== 'admin') {
+          showDashboard();
+        } else if (currentUserData && currentUserData.role === 'admin') {
+          // Redirect admins to admin panel
+          window.location.href = 'admin.html';
+        } else {
+          showError('User profile not found. Contact administrator.');
+          await logOut();
+        }
+      } else {
+        showSignIn();
+      }
+    });
+
+    // Sign in form handler
+    signInForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      
+      const result = await signIn(email, password);
+      if (!result.success) {
+        showError(result.error);
+      }
+    });
+
+    // Logout handler
+    logoutBtn.addEventListener('click', async () => {
+      await logOut();
+    });
+
+    // Forgot password
+    document.getElementById('forgotPasswordLink').addEventListener('click', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('email').value;
+      if (!email) {
+        showError('Enter your email address first');
+        return;
+      }
+      // Import and call resetPassword
+      const { resetPassword } = await import('./js/auth.js');
+      const result = await resetPassword(email);
+      if (result.success) {
+        alert('Password reset email sent. Check your inbox.');
+      } else {
+        showError(result.error);
+      }
+    });
+
+    // Back to dashboard
+    document.getElementById('backToDashboard').addEventListener('click', () => {
+      destroyForm();
+      clearAutoSave();
+      showDashboard();
+    });
+
+    // Save draft
+    document.getElementById('saveDraftBtn').addEventListener('click', async () => {
+      await saveDraft();
+    });
+
+    // Submit response
+    document.getElementById('submitBtn').addEventListener('click', async () => {
+      const validation = validateForm(currentTemplate.fields);
+      if (!validation.valid) {
+        const errorMessages = validation.errors.map(e => `Row ${e.row}: ${e.label}`).join('\n');
+        alert(`Please complete required fields:\n${errorMessages}`);
+        return;
+      }
+      
+      if (!confirm('Submit this response? You will not be able to edit it after submission.')) {
+        return;
+      }
+      
+      await saveDraft();
+      await submitResponse(currentResponse.responseId);
+      alert('Response submitted successfully!');
+      destroyForm();
+      clearAutoSave();
+      showDashboard();
+    });
+
+    // Show sign in view
+    function showSignIn() {
+      signInSection.classList.remove('d-none');
+      dashboardSection.classList.add('d-none');
+      formSection.classList.add('d-none');
+      userDisplay.classList.add('d-none');
+      logoutBtn.classList.add('d-none');
+      signInError.classList.add('d-none');
+    }
+
+    // Show dashboard view
+    async function showDashboard() {
+      signInSection.classList.add('d-none');
+      dashboardSection.classList.remove('d-none');
+      formSection.classList.add('d-none');
+      userDisplay.textContent = currentUser.email;
+      userDisplay.classList.remove('d-none');
+      logoutBtn.classList.remove('d-none');
+      
+      await loadJobs();
+    }
+
+    // Show form view
+    function showForm() {
+      signInSection.classList.add('d-none');
+      dashboardSection.classList.add('d-none');
+      formSection.classList.remove('d-none');
+    }
+
+    // Show error message
+    function showError(message) {
+      signInError.textContent = message;
+      signInError.classList.remove('d-none');
+    }
+
+    // Load assigned jobs
+    async function loadJobs() {
+      jobsList.innerHTML = '<div class="col-12"><div class="loading-spinner"><div class="spinner-border text-primary"></div></div></div>';
+      
+      try {
+        const assignedJobs = currentUserData.assignedJobs || [];
+        const templates = await getAllTemplates();
+        
+        // Filter to assigned jobs only
+        const userTemplates = templates.filter(t => assignedJobs.includes(t.jobId));
+        
+        if (userTemplates.length === 0) {
+          jobsList.innerHTML = '';
+          noJobsMessage.classList.remove('d-none');
+          return;
+        }
+        
+        noJobsMessage.classList.add('d-none');
+        jobsList.innerHTML = userTemplates.map(template => `
+          <div class="col-md-4">
+            <div class="card job-card" data-job-id="${template.jobId}">
+              <div class="card-body">
+                <h6 class="card-title">${template.title}</h6>
+                <p class="card-text small text-muted">${template.description || 'No description'}</p>
+                <div class="d-flex justify-content-between align-items-center">
+                  <span class="badge bg-secondary">${template.fields?.length || 0} questions</span>
+                  <span class="text-primary small">Start →</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        `).join('');
+        
+        // Add click handlers
+        document.querySelectorAll('.job-card').forEach(card => {
+          card.addEventListener('click', () => loadJob(card.dataset.jobId));
+        });
+        
+      } catch (error) {
+        console.error('Error loading jobs:', error);
+        jobsList.innerHTML = '<div class="col-12"><div class="alert alert-danger">Error loading jobs. Please try again.</div></div>';
+      }
+    }
+
+    // Load a specific job/form
+    async function loadJob(jobId) {
+      try {
+        currentTemplate = await getTemplate(jobId);
+        if (!currentTemplate) {
+          alert('Template not found');
+          return;
+        }
+        
+        // Make template available globally for form renderer
+        window.currentTemplate = currentTemplate;
+        
+        // Get or create response
+        currentResponse = await getOrCreateResponse(
+          currentUser.email, 
+          jobId, 
+          currentTemplate.version
+        );
+        
+        currentJob = jobId;
+        
+        // Update UI
+        document.getElementById('formTitle').textContent = currentTemplate.title;
+        document.getElementById('formDescription').textContent = currentTemplate.description || '';
+        updateStatusBadge(currentResponse.status);
+        
+        // Initialize form
+        const isReadOnly = currentResponse.status === 'submitted';
+        initializeForm('formContainer', currentTemplate, currentResponse.data || {}, {
+          readOnly: isReadOnly,
+          onDataChange: () => updateProgress()
+        });
+        
+        updateProgress();
+        
+        // Setup auto-save for drafts
+        if (!isReadOnly) {
+          setupAutoSave();
+        }
+        
+        // Update buttons
+        document.getElementById('saveDraftBtn').disabled = isReadOnly;
+        document.getElementById('submitBtn').disabled = isReadOnly;
+        
+        showForm();
+        
+      } catch (error) {
+        console.error('Error loading job:', error);
+        alert('Error loading questionnaire. Please try again.');
+      }
+    }
+
+    // Update status badge
+    function updateStatusBadge(status) {
+      const badge = document.getElementById('formStatus');
+      badge.className = 'badge';
+      switch (status) {
+        case 'draft':
+          badge.classList.add('badge-draft');
+          badge.textContent = 'Draft';
+          break;
+        case 'submitted':
+          badge.classList.add('badge-submitted');
+          badge.textContent = 'Submitted';
+          break;
+        default:
+          badge.classList.add('badge-new');
+          badge.textContent = 'New';
+      }
+    }
+
+    // Update progress indicator
+    function updateProgress() {
+      const data = extractResponseData(currentTemplate.fields);
+      const totalFields = currentTemplate.fields.length;
+      const filledFields = currentTemplate.fields.filter(f => {
+        const value = data[f.id];
+        return value !== undefined && value !== null && value !== '';
+      }).length;
+      
+      const percentage = Math.round((filledFields / totalFields) * 100);
+      document.getElementById('progressBar').style.width = `${percentage}%`;
+      document.getElementById('progressText').textContent = `${percentage}% complete (${filledFields}/${totalFields})`;
+    }
+
+    // Save draft
+    async function saveDraft() {
+      if (!currentResponse || currentResponse.status === 'submitted') return;
+      
+      const data = extractResponseData(currentTemplate.fields);
+      await updateResponseData(currentResponse.responseId, data);
+      
+      const now = new Date();
+      document.getElementById('lastSaved').textContent = `Last saved: ${now.toLocaleTimeString()}`;
+    }
+
+    // Setup auto-save
+    function setupAutoSave() {
+      clearAutoSave();
+      autoSaveTimer = setInterval(async () => {
+        await saveDraft();
+      }, 30000); // Auto-save every 30 seconds
+    }
+
+    // Clear auto-save
+    function clearAutoSave() {
+      if (autoSaveTimer) {
+        clearInterval(autoSaveTimer);
+        autoSaveTimer = null;
+      }
+    }
+  </script>
+</body>
+</html>

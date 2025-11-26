@@ -1,0 +1,67 @@
+---
+title: "Political Data Collection"
+subtitle: "Systematic data collection for political science research"
+format:
+  html:
+    theme: cosmo
+    toc: false
+    css: css/styles.css
+---
+
+::: {.hero-section style="text-align: center; padding: 60px 20px; background: linear-gradient(135deg, #2c5282 0%, #4a5568 100%); color: white; margin: -20px -20px 40px -20px;"}
+
+# 📊 Political Data Collection
+
+### A web application for systematic collection of political science research data
+
+:::
+
+## About This Project
+
+This application facilitates distributed data collection for research on citizen-initiated democratic instruments across countries. Research assistants (coders) complete structured questionnaires, while administrators manage templates, users, and analyze submitted responses.
+
+## Getting Started
+
+::: {.grid style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-top: 30px;"}
+
+::: {.card style="padding: 30px; border: 1px solid #e2e8f0; border-radius: 8px; text-align: center;"}
+
+### 👤 Research Assistants
+
+Sign in to view your assigned questionnaires and submit responses.
+
+[Sign In](signin.html){.btn .btn-primary style="display: inline-block; margin-top: 15px; padding: 10px 30px; background: #2c5282; color: white; text-decoration: none; border-radius: 5px;"}
+
+:::
+
+::: {.card style="padding: 30px; border: 1px solid #e2e8f0; border-radius: 8px; text-align: center;"}
+
+### ⚙️ Administrators
+
+Manage users, create questionnaire templates, and review submitted data.
+
+[Admin Panel](admin.html){.btn .btn-secondary style="display: inline-block; margin-top: 15px; padding: 10px 30px; background: #4a5568; color: white; text-decoration: none; border-radius: 5px;"}
+
+:::
+
+:::
+
+## Features
+
+- **Flexible Questionnaires**: Support for multiple field types (dropdowns, text, radio buttons, dates)
+- **Role-Based Access**: Separate interfaces for coders and administrators
+- **Auto-Save Drafts**: Never lose your work with automatic draft saving
+- **CSV Export**: Export collected data for analysis
+- **Progress Tracking**: Visual indicators show completion status
+
+## Documentation
+
+- [User Guide](docs/user-guide.html) - How to use the application
+- [Admin Guide](docs/admin-guide.html) - Managing users and templates
+- [Template Format](docs/template-format.html) - CSV template specification
+
+---
+
+::: {style="text-align: center; color: #6c757d; font-size: 0.9em; margin-top: 40px;"}
+Political Data Collection App v3.0 | Built with Firebase
+:::
