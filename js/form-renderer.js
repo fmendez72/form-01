@@ -3,6 +3,8 @@
 
 let hotInstance = null;
 let collapsedGroups = new Set(); // Track which groups are collapsed
+let currentResponseData = {}; // Track current field values for conditional logic
+let hiddenFieldIds = new Set(); // Track fields hidden by conditional logic
 
 // Initialize Handsontable with template schema
 export function initializeForm(containerId, template, responseData, options = {}) {
@@ -49,13 +51,13 @@ export function initializeForm(containerId, template, responseData, options = {}
       const cellProperties = {};
       const rowData = this.instance.getSourceDataAtRow(row);
 
-      // Check if row should be hidden
+      // Check if row should be hidden (group collapse or conditional logic)
       if (isRowHidden(this.instance, row)) {
         cellProperties.className = 'hidden-row';
       }
 
       // Check if this is a group header row
-      const isGroupHeader = rowData?.fieldId && rowData.fieldId.endsWith('_header');
+      const isGroupHeader = rowData?.isGroupHeader === true;
       if (isGroupHeader) {
         cellProperties.readOnly = true;
         if (col > 0) {
@@ -81,7 +83,7 @@ export function initializeForm(containerId, template, responseData, options = {}
     beforeRenderer: function(TD, row, col, prop, value, cellProperties) {
       // Hide rows that belong to collapsed groups
       const rowData = this.getSourceDataAtRow(row);
-      if (rowData && rowData.group && !rowData.fieldId.endsWith('_header')) {
+      if (rowData && rowData.group && !rowData.isGroupHeader) {
         if (collapsedGroups.has(rowData.group)) {
           TD.parentElement.style.display = 'none';
         } else {
@@ -89,8 +91,13 @@ export function initializeForm(containerId, template, responseData, options = {}
         }
       }
 
+      // Hide rows based on conditional logic
+      if (rowData && !rowData.isGroupHeader && hiddenFieldIds.has(rowData.fieldId)) {
+        TD.parentElement.style.display = 'none';
+      }
+
       // Hide additional cells in group header rows
-      const isGroupHeader = rowData?.fieldId && rowData.fieldId.endsWith('_header');
+      const isGroupHeader = rowData?.isGroupHeader === true;
       if (isGroupHeader && col > 0) {
         TD.style.display = 'none';
       }
@@ -150,19 +157,86 @@ function buildColHeaders(helpDisplay) {
   return headers;
 }
 
-// Build data array from template fields
+// Build data array from template fields with auto-generated group headers
 function buildDataArray(fields, responseData = {}) {
-  return fields.map(field => ({
-    fieldId: field.id,
-    label: field.label,
-    help: field.help || '',
-    type: field.type,
-    options: field.options || [],
-    required: field.required,
-    group: field.group || '',
-    answer: responseData[field.id] ?? field.defaultValue ?? '',
-    note: responseData[`${field.id}_note`] ?? ''
-  }));
+  const dataArray = [];
+  let lastGroup = null;
+
+  // Initialize current response data for conditional logic
+  currentResponseData = {...responseData};
+
+  // Evaluate which fields should be hidden based on conditional logic
+  updateHiddenFields(fields, responseData);
+
+  for (const field of fields) {
+    // Insert group header if group changes and field has a group
+    if (field.group && field.group !== lastGroup) {
+      dataArray.push({
+        fieldId: `__group_header_${field.group}`,
+        label: field.group,
+        help: '',
+        type: 'header',
+        options: [],
+        required: false,
+        group: field.group,
+        answer: '',
+        note: '',
+        isGroupHeader: true
+      });
+      lastGroup = field.group;
+    }
+
+    // Add the field (will be hidden by renderer if in hiddenFieldIds)
+    dataArray.push({
+      fieldId: field.id,
+      label: field.label,
+      help: field.help || '',
+      type: field.type,
+      options: field.options || [],
+      required: field.required,
+      group: field.group || '',
+      answer: responseData[field.id] ?? field.defaultValue ?? '',
+      note: responseData[`${field.id}_note`] ?? '',
+      isGroupHeader: false,
+      skipIf: field.skipIf || '',
+      skipToFieldId: field.skipToFieldId || '',
+      minValue: field.minValue,
+      maxValue: field.maxValue
+    });
+  }
+
+  return dataArray;
+}
+
+// Update the set of hidden field IDs based on conditional logic
+function updateHiddenFields(fields, responseData) {
+  hiddenFieldIds.clear();
+
+  // Build map of field ID to field for quick lookup
+  const fieldMap = new Map(fields.map(f => [f.id, f]));
+
+  for (const field of fields) {
+    if (field.skipIf && field.skipToFieldId) {
+      const currentValue = responseData[field.id] || '';
+
+      // If skip condition is met, hide fields between this one and target
+      if (currentValue === field.skipIf) {
+        const targetField = fieldMap.get(field.skipToFieldId);
+        if (targetField) {
+          // Find indices
+          const currentIndex = fields.findIndex(f => f.id === field.id);
+          const targetIndex = fields.findIndex(f => f.id === field.skipToFieldId);
+
+          // Hide all fields between current and target (exclusive)
+          if (targetIndex > currentIndex) {
+            for (let i = currentIndex + 1; i < targetIndex; i++) {
+              hiddenFieldIds.add(fields[i].id);
+            }
+          }
+        }
+      }
+    }
+  }
 }
 
 // Custom renderer for label column (with tooltip help)
@@ -172,8 +246,8 @@ function labelRenderer(instance, td, row, col, prop, value, cellProperties) {
   const rowData = instance.getSourceDataAtRow(row);
   td.innerHTML = '';
 
-  // Check if this is a group header row
-  const isGroupHeader = rowData.fieldId && rowData.fieldId.endsWith('_header');
+  // Check if this is a group header row (auto-generated)
+  const isGroupHeader = rowData.isGroupHeader === true;
 
   if (isGroupHeader) {
     // Render as collapsible section header
@@ -254,7 +328,7 @@ function labelRenderer(instance, td, row, col, prop, value, cellProperties) {
 // Custom renderer for help column
 function helpColumnRenderer(instance, td, row, col, prop, value, cellProperties) {
   const rowData = instance.getSourceDataAtRow(row);
-  const isGroupHeader = rowData?.fieldId && rowData.fieldId.endsWith('_header');
+  const isGroupHeader = rowData?.isGroupHeader === true;
 
   if (isGroupHeader) {
     // Hide help column for group headers
@@ -280,7 +354,7 @@ function answerRenderer(instance, td, row, col, prop, value, cellProperties) {
   const isReadOnly = instance.getSettings().readOnly;
 
   // Check if this is a group header row
-  const isGroupHeader = rowData.fieldId && rowData.fieldId.endsWith('_header');
+  const isGroupHeader = rowData.isGroupHeader === true;
   if (isGroupHeader) {
     // No answer input for group headers
     td.style.display = 'none';
@@ -366,7 +440,15 @@ function answerRenderer(instance, td, row, col, prop, value, cellProperties) {
       input.className = 'form-control form-control-sm';
       input.value = value || '';
       input.disabled = isReadOnly;
-      
+
+      // Set min/max if specified
+      if (rowData.minValue !== null && rowData.minValue !== undefined) {
+        input.min = rowData.minValue;
+      }
+      if (rowData.maxValue !== null && rowData.maxValue !== undefined) {
+        input.max = rowData.maxValue;
+      }
+
       // Use input event for immediate updates
       input.oninput = () => {
         instance.setDataAtRowProp(row, 'answer', input.value);
@@ -447,7 +529,7 @@ function answerRenderer(instance, td, row, col, prop, value, cellProperties) {
 // Custom renderer for notes column
 function notesRenderer(instance, td, row, col, prop, value, cellProperties) {
   const rowData = instance.getSourceDataAtRow(row);
-  const isGroupHeader = rowData?.fieldId && rowData.fieldId.endsWith('_header');
+  const isGroupHeader = rowData?.isGroupHeader === true;
 
   if (isGroupHeader) {
     // Hide notes column for group headers
@@ -471,18 +553,27 @@ function toggleGroupCollapse(instance, groupName) {
   instance.render();
 }
 
-// Check if a row should be hidden based on group collapse state
+// Check if a row should be hidden based on group collapse state or conditional logic
 function isRowHidden(instance, row) {
   const rowData = instance.getSourceDataAtRow(row);
-  if (!rowData || !rowData.group) return false;
+  if (!rowData) return false;
 
-  // Don't hide the header row itself
-  if (rowData.fieldId && rowData.fieldId.endsWith('_header')) {
+  // Don't hide group header rows themselves
+  if (rowData.isGroupHeader) {
     return false;
   }
 
   // Hide if the group is collapsed
-  return collapsedGroups.has(rowData.group);
+  if (rowData.group && collapsedGroups.has(rowData.group)) {
+    return true;
+  }
+
+  // Hide if conditional logic says so
+  if (hiddenFieldIds.has(rowData.fieldId)) {
+    return true;
+  }
+
+  return false;
 }
 
 // Show help tooltip
@@ -545,32 +636,51 @@ export function syncAllInputs() {
 // Extract response data from Handsontable
 export function extractResponseData(fields) {
   if (!hotInstance) return {};
-  
+
   const data = {};
   const sourceData = hotInstance.getSourceData();
-  
+
   sourceData.forEach((row, index) => {
+    // Skip group headers (auto-generated rows)
+    if (row.isGroupHeader) return;
+
     const fieldId = row.fieldId;
     data[fieldId] = row.answer;
     if (row.note) {
       data[`${fieldId}_note`] = row.note;
     }
   });
-  
+
+  // Update hidden fields based on current data (for conditional logic)
+  if (fields) {
+    updateHiddenFields(fields, data);
+    // Re-render to show/hide fields
+    if (hotInstance) {
+      hotInstance.render();
+    }
+  }
+
   return data;
 }
 
 // Validate required fields
 export function validateForm(fields) {
   if (!hotInstance) return { valid: true, errors: [] };
-  
+
   // First sync all inputs to ensure we have latest data
   syncAllInputs();
-  
+
   const errors = [];
   const sourceData = hotInstance.getSourceData();
-  
+
   sourceData.forEach((row, index) => {
+    // Skip group headers
+    if (row.isGroupHeader) return;
+
+    // Skip fields hidden by conditional logic
+    if (hiddenFieldIds.has(row.fieldId)) return;
+
+    // Check required fields
     if (row.required && !row.answer) {
       errors.push({
         row: index + 1,
@@ -579,8 +689,31 @@ export function validateForm(fields) {
         message: 'This field is required'
       });
     }
+
+    // Validate number field min/max
+    if (row.type === 'number' && row.answer) {
+      const numValue = parseFloat(row.answer);
+      if (!isNaN(numValue)) {
+        if (row.minValue !== null && row.minValue !== undefined && numValue < row.minValue) {
+          errors.push({
+            row: index + 1,
+            fieldId: row.fieldId,
+            label: row.label,
+            message: `Value must be at least ${row.minValue}`
+          });
+        }
+        if (row.maxValue !== null && row.maxValue !== undefined && numValue > row.maxValue) {
+          errors.push({
+            row: index + 1,
+            fieldId: row.fieldId,
+            label: row.label,
+            message: `Value must be at most ${row.maxValue}`
+          });
+        }
+      }
+    }
   });
-  
+
   return {
     valid: errors.length === 0,
     errors: errors

@@ -1,0 +1,11 @@
+item_id,field_id,field_type,label,help_text,required,options,default_value,skip_if,skip_to_field_id,group,min_value,max_value
+10,country_name,text,Country Name,Enter the official country name,yes,,,,,Basic Information,,
+20,independence,radio,Is country independent?,Select sovereignty status,yes,Yes|No|Disputed,,No,final_notes,Basic Information,,
+30,independence_year,number,Year of Independence,4-digit year,yes,,,,,Basic Information,1500,2024
+40,has_parliament,radio,Parliament exists?,Does the country have a parliament?,yes,Yes|No,,No,has_referendum,Governance,,
+50,parliament_type,dropdown,Type of Parliament,Select parliamentary system,yes,Unicameral|Bicameral|Other,,,,Governance,,
+60,parliament_seats,number,Number of Seats,Total seats in parliament,yes,,,,,Governance,1,1000
+70,has_referendum,radio,Referendum provision exists?,Is there a referendum mechanism?,yes,Yes|No,,No,final_notes,Direct Democracy,,
+80,referendum_type,dropdown,Type of Referendum,Select primary type,yes,Mandatory|Optional|Citizen-initiated|Advisory,,,,Direct Democracy,,
+90,signature_threshold,number,Signature Threshold (%),Percentage of voters required,no,,,,,Direct Democracy,0,100
+100,final_notes,textarea,Final Notes,Additional observations or comments,no,,,,,,,

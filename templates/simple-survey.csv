@@ -1,0 +1,9 @@
+item_id,field_id,field_type,label,help_text,required,options,default_value,skip_if,skip_to_field_id,group,min_value,max_value
+10,name,text,Full Name,Enter your complete legal name,yes,,,,,,,
+20,email,text,Email Address,We'll use this to contact you,yes,,,,,,,
+30,age,number,Age,Your age in years,yes,,,,,,18,120
+40,country,dropdown,Country,Select your country of residence,yes,United States|Canada|United Kingdom|Australia|Germany|France|Spain|Italy|Other,,,,,,
+50,satisfaction,radio,Overall Satisfaction,How satisfied are you with our service?,yes,Very Satisfied|Satisfied|Neutral|Dissatisfied|Very Dissatisfied,,,,,,
+60,recommend,radio,Would you recommend us?,Would you recommend us to others?,yes,Yes|No|Maybe,,No,comments,,,
+70,rating,number,Rating (1-10),Rate us from 1 to 10,yes,,,,,,1,10
+80,comments,textarea,Additional Comments,Share any additional thoughts,no,,,,,,

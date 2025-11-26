@@ -1,0 +1,18 @@
+item_id,field_id,field_type,label,help_text,required,options,default_value,skip_if,skip_to_field_id,group,min_value,max_value
+10,emp_name,text,Employee Name,,yes,,,,,Demographics,,
+20,emp_dept,dropdown,Department,,yes,Engineering|Sales|Marketing|HR|Finance|Operations,,,,,Demographics,,
+30,emp_tenure,number,Years at Company,,yes,,,,,Demographics,0,50
+40,wenv_1,radio,Office facilities are adequate,Rate the quality of physical workspace,yes,Strongly Agree|Agree|Neutral|Disagree|Strongly Disagree,,,,,Work Environment,,
+50,wenv_2,radio,Equipment meets my needs,Computers and tools are sufficient,yes,Strongly Agree|Agree|Neutral|Disagree|Strongly Disagree,,,,,Work Environment,,
+60,wenv_3,radio,Workspace is comfortable,Temperature and lighting are appropriate,yes,Strongly Agree|Agree|Neutral|Disagree|Strongly Disagree,,,,,Work Environment,,
+70,wenv_comments,textarea,Environment Comments,Additional feedback on work environment,no,,,,,Work Environment,,
+80,mgmt_1,radio,Manager provides clear direction,I understand expectations,yes,Strongly Agree|Agree|Neutral|Disagree|Strongly Disagree,,,,,Management,,
+90,mgmt_2,radio,I receive regular feedback,Performance feedback is constructive,yes,Strongly Agree|Agree|Neutral|Disagree|Strongly Disagree,,,,,Management,,
+100,mgmt_3,radio,Management is approachable,I can raise concerns comfortably,yes,Strongly Agree|Agree|Neutral|Disagree|Strongly Disagree,,,,,Management,,
+110,mgmt_comments,textarea,Management Comments,Additional feedback on leadership,no,,,,,Management,,
+120,career_1,radio,Training opportunities available,I can access professional development,yes,Strongly Agree|Agree|Neutral|Disagree|Strongly Disagree,,,,,Career Development,,
+130,career_2,radio,Career path is clear,I understand advancement opportunities,yes,Strongly Agree|Agree|Neutral|Disagree|Strongly Disagree,,,,,Career Development,,
+140,career_3,radio,Skills are being developed,My role allows professional growth,yes,Strongly Agree|Agree|Neutral|Disagree|Strongly Disagree,,,,,Career Development,,
+150,overall_satisfaction,number,Overall Satisfaction (1-10),Rate your overall job satisfaction,yes,,,,,Overall,1,10
+160,would_recommend,radio,Would recommend to friends,I would suggest friends apply here,yes,Yes|No|Maybe,,,,,Overall,,
+170,final_feedback,textarea,Final Comments,Any other feedback,no,,,,,,,
