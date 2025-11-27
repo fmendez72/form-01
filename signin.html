@@ -92,6 +92,18 @@
         </div>
       </div>
 
+      <!-- View Toggle -->
+      <div class="view-toggle mb-3">
+        <div class="btn-group btn-group-sm" role="group" aria-label="View toggle">
+          <button type="button" class="btn btn-outline-primary active" id="formViewBtn">
+            📝 Form View
+          </button>
+          <button type="button" class="btn btn-outline-primary" id="tableViewBtn">
+            📊 Table View
+          </button>
+        </div>
+      </div>
+
       <div class="card">
         <div class="card-body p-0">
           <div id="formContainer"></div>
@@ -121,7 +133,8 @@
   <script type="module">
     import { signIn, logOut, onAuthChange, getUserData } from './js/auth.js';
     import { getTemplate, getAllTemplates, getOrCreateResponse, updateResponseData, submitResponse } from './js/firestore-service.js';
-    import { initializeForm, extractResponseData, validateForm, destroyForm, syncAllInputs } from './js/form-renderer.js';
+    import * as standardRenderer from './js/form-renderer-standard.js';
+    import * as tableRenderer from './js/form-renderer.js';
 
     // State
     let currentUser = null;
@@ -130,6 +143,8 @@
     let currentTemplate = null;
     let currentResponse = null;
     let autoSaveTimer = null;
+    let currentRenderer = null; // Track which renderer is active
+    let currentView = localStorage.getItem('formViewPreference') || 'form'; // 'form' or 'table'
 
     // DOM Elements
     const signInSection = document.getElementById('signInSection');
@@ -198,9 +213,22 @@
 
     // Back to dashboard
     document.getElementById('backToDashboard').addEventListener('click', () => {
-      destroyForm();
+      destroyCurrentForm();
       clearAutoSave();
       showDashboard();
+    });
+
+    // View toggle handlers
+    document.getElementById('formViewBtn').addEventListener('click', () => {
+      if (currentView !== 'form') {
+        switchView('form');
+      }
+    });
+
+    document.getElementById('tableViewBtn').addEventListener('click', () => {
+      if (currentView !== 'table') {
+        switchView('table');
+      }
     });
 
     // Save draft
@@ -211,27 +239,27 @@
     // Submit response
     document.getElementById('submitBtn').addEventListener('click', async () => {
       // First sync all inputs to capture any unsaved edits
-      syncAllInputs();
-      
+      currentRenderer.syncAllInputs();
+
       // Small delay to ensure sync is complete
       await new Promise(resolve => setTimeout(resolve, 100));
-      
-      const validation = validateForm(currentTemplate.fields);
+
+      const validation = currentRenderer.validateForm(currentTemplate.fields);
       if (!validation.valid) {
         const errorMessages = validation.errors.map(e => `Row ${e.row}: ${e.label}`).join('\n');
         alert(`Please complete required fields:\n${errorMessages}`);
         return;
       }
-      
+
       if (!confirm('Submit this response? You will not be able to edit it after submission.')) {
         return;
       }
-      
+
       // Save before submitting
       await saveDraft();
       await submitResponse(currentResponse.responseId);
       alert('Response submitted successfully!');
-      destroyForm();
+      destroyCurrentForm();
       clearAutoSave();
       showDashboard();
     });
@@ -315,6 +343,61 @@
       }
     }
 
+    // Get active renderer based on current view
+    function getActiveRenderer() {
+      return currentView === 'form' ? standardRenderer : tableRenderer;
+    }
+
+    // Update view toggle buttons
+    function updateViewToggleButtons() {
+      const formBtn = document.getElementById('formViewBtn');
+      const tableBtn = document.getElementById('tableViewBtn');
+
+      if (currentView === 'form') {
+        formBtn.classList.add('active');
+        tableBtn.classList.remove('active');
+      } else {
+        formBtn.classList.remove('active');
+        tableBtn.classList.add('active');
+      }
+    }
+
+    // Switch between form and table view
+    function switchView(newView) {
+      if (!currentTemplate || !currentResponse) return;
+
+      // Extract current data before destroying
+      const currentData = currentRenderer.extractResponseData(currentTemplate.fields);
+
+      // Destroy current form
+      destroyCurrentForm();
+
+      // Update view preference
+      currentView = newView;
+      localStorage.setItem('formViewPreference', newView);
+
+      // Update toggle buttons
+      updateViewToggleButtons();
+
+      // Re-initialize with new renderer
+      currentRenderer = getActiveRenderer();
+      const isReadOnly = currentResponse.status === 'submitted';
+
+      currentRenderer.initializeForm('formContainer', currentTemplate, currentData, {
+        readOnly: isReadOnly,
+        onDataChange: () => updateProgress()
+      });
+
+      updateProgress();
+    }
+
+    // Destroy current form (using active renderer)
+    function destroyCurrentForm() {
+      if (currentRenderer) {
+        currentRenderer.destroyForm();
+      }
+    }
+
     // Load a specific job/form
     async function loadJob(jobId) {
       try {
@@ -323,44 +406,49 @@
           alert('Template not found');
           return;
         }
-        
+
         // Make template available globally for form renderer
         window.currentTemplate = currentTemplate;
-        
+
         // Get or create response
         currentResponse = await getOrCreateResponse(
-          currentUser.email, 
-          jobId, 
+          currentUser.email,
+          jobId,
           currentTemplate.version
         );
-        
+
         currentJob = jobId;
-        
+
         // Update UI
         document.getElementById('formTitle').textContent = currentTemplate.title;
         document.getElementById('formDescription').textContent = currentTemplate.description || '';
         updateStatusBadge(currentResponse.status);
-        
-        // Initialize form
+
+        // Update view toggle buttons based on saved preference
+        updateViewToggleButtons();
+
+        // Initialize form with active renderer
+        currentRenderer = getActiveRenderer();
         const isReadOnly = currentResponse.status === 'submitted';
-        initializeForm('formContainer', currentTemplate, currentResponse.data || {}, {
+
+        currentRenderer.initializeForm('formContainer', currentTemplate, currentResponse.data || {}, {
           readOnly: isReadOnly,
           onDataChange: () => updateProgress()
         });
-        
+
         updateProgress();
-        
+
         // Setup auto-save for drafts
         if (!isReadOnly) {
           setupAutoSave();
         }
-        
+
         // Update buttons
         document.getElementById('saveDraftBtn').disabled = isReadOnly;
         document.getElementById('submitBtn').disabled = isReadOnly;
-        
+
         showForm();
-        
+
       } catch (error) {
         console.error('Error loading job:', error);
         alert('Error loading questionnaire. Please try again.');
@@ -388,13 +476,15 @@
 
     // Update progress indicator
     function updateProgress() {
-      const data = extractResponseData(currentTemplate.fields);
+      if (!currentRenderer) return;
+
+      const data = currentRenderer.extractResponseData(currentTemplate.fields);
       const totalFields = currentTemplate.fields.length;
       const filledFields = currentTemplate.fields.filter(f => {
         const value = data[f.id];
         return value !== undefined && value !== null && value !== '';
       }).length;
-      
+
       const percentage = Math.round((filledFields / totalFields) * 100);
       document.getElementById('progressBar').style.width = `${percentage}%`;
       document.getElementById('progressText').textContent = `${percentage}% complete (${filledFields}/${totalFields})`;
@@ -402,14 +492,14 @@
 
     // Save draft
     async function saveDraft() {
-      if (!currentResponse || currentResponse.status === 'submitted') return;
-      
+      if (!currentResponse || currentResponse.status === 'submitted' || !currentRenderer) return;
+
       // Sync all inputs before extracting data
-      syncAllInputs();
-      
-      const data = extractResponseData(currentTemplate.fields);
+      currentRenderer.syncAllInputs();
+
+      const data = currentRenderer.extractResponseData(currentTemplate.fields);
       await updateResponseData(currentResponse.responseId, data);
-      
+
       const now = new Date();
       document.getElementById('lastSaved').textContent = `Last saved: ${now.toLocaleTimeString()}`;
     }

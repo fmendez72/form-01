@@ -1,4 +1,4 @@
 user_email,password,assigned_jobs,role
-admin@example.com,admin123,"doc-coding,employee-1,gov-1,ref-1",admin
-coder1@example.com,coder123,"doc-coding,employee-1,gov-1,ref-1",coder
-coder2@example.com,coder456,ref-1,coder
+admin@example.com,admin123,"simple-survey,conditional-form,grouped-likert,document-coding",admin
+coder1@example.com,coder123,"simple-survey,conditional-form,grouped-likert,document-coding",coder
+coder2@example.com,coder456,"simple-survey,conditional-form,grouped-likert,document-coding",coder

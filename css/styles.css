@@ -308,3 +308,94 @@ body {
 .handsontable td.group-header-notes {
   display: none !important;
 }
+
+/* Standard Form Renderer */
+.form-field {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.form-field:last-child {
+  border-bottom: none;
+}
+
+.form-field.d-none {
+  display: none !important;
+}
+
+/* Completion badges in accordion headers */
+.accordion-button .completion-badge {
+  font-weight: normal;
+  font-size: 0.75em;
+  margin-left: auto;
+  margin-right: 8px;
+}
+
+.completion-badge.bg-success {
+  background-color: var(--success-color) !important;
+}
+
+.completion-badge.bg-secondary {
+  background-color: var(--secondary-color) !important;
+}
+
+/* Notes section styling */
+.field-notes {
+  margin-top: 8px;
+}
+
+.field-notes .form-label {
+  font-size: 0.85em;
+  color: var(--secondary-color);
+  margin-bottom: 4px;
+}
+
+/* View toggle */
+.view-toggle {
+  margin-bottom: 16px;
+}
+
+.view-toggle .btn-group {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Help icon improvements for standard form */
+.form-label .help-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background-color: #e2e8f0;
+  font-size: 12px;
+  cursor: help;
+  transition: background-color 0.2s;
+  vertical-align: middle;
+}
+
+.form-label .help-icon:hover {
+  background-color: #cbd5e0;
+}
+
+/* Ungrouped fields container */
+.ungrouped-fields {
+  border-top: 1px solid var(--border-color);
+  padding-top: 16px;
+}
+
+/* Accordion customization for form renderer */
+#formAccordion .accordion-item {
+  border: 1px solid var(--border-color);
+  margin-bottom: 8px;
+  border-radius: 4px;
+}
+
+#formAccordion .accordion-button:not(.collapsed) {
+  background-color: var(--light-bg);
+  color: var(--primary-color);
+}
+
+#formAccordion .accordion-body {
+  padding: 16px;
+}

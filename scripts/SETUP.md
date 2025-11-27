@@ -34,11 +34,19 @@ Click on: **data-collector-2025**
 mv ~/Downloads/data-collector-2025-abc123.json scripts/firebase-config.json
 ```
 
-### Step 6: Verify Setup
+### Step 6: Set Up Python Virtual Environment
+
+Modern Python installations require virtual environments for package management:
 
 ```bash
-# Install dependencies (if not already done)
-pip install firebase-admin
+# Create virtual environment
+python3 -m venv venv
+
+# Activate virtual environment
+source venv/bin/activate
+
+# Install dependencies
+pip install -r scripts/requirements.txt
 
 # Test the script
 python scripts/upload_templates.py --list
@@ -100,9 +108,27 @@ Once setup is complete, see [README.md](README.md) for usage instructions.
 
 Quick start:
 ```bash
+# Make sure virtual environment is activated
+source venv/bin/activate
+
 # Upload all templates
 python scripts/upload_templates.py
 
 # Upload specific template
 python scripts/upload_templates.py simple-survey
+
+# When done, deactivate virtual environment
+deactivate
+```
+
+## Virtual Environment Notes
+
+✅ **Virtual environment benefits:**
+- Isolated dependencies (~20MB total)
+- Easy to delete when done (`rm -rf venv/`)
+- No conflicts with system Python
+
+✅ **Remember to activate before each session:**
+```bash
+source venv/bin/activate
 ```

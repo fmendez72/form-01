@@ -4,9 +4,18 @@ Python scripts for uploading templates directly to Firestore, bypassing the admi
 
 ## Setup
 
-### 1. Install Dependencies
+### 1. Set Up Python Virtual Environment
+
+Modern Python installations require virtual environments for package management:
 
 ```bash
+# Create virtual environment
+python3 -m venv venv
+
+# Activate virtual environment
+source venv/bin/activate
+
+# Install dependencies
 pip install -r scripts/requirements.txt
 ```
 
@@ -29,6 +38,12 @@ pip install -r scripts/requirements.txt
 **Important:** Never commit this file to git! It contains sensitive credentials.
 
 ## Usage
+
+**Important:** Always activate the virtual environment before running scripts:
+
+```bash
+source venv/bin/activate
+```
 
 ### List Available Templates
 
@@ -78,6 +93,9 @@ python scripts/upload_templates.py --dry-run
 ## Example Workflow
 
 ```bash
+# 0. Activate virtual environment
+source venv/bin/activate
+
 # 1. Clear all existing templates
 python scripts/upload_templates.py --clear
 
@@ -92,6 +110,9 @@ python scripts/upload_templates.py
 
 # 5. Re-upload just that template
 python scripts/upload_templates.py simple-survey
+
+# 6. When done, deactivate
+deactivate
 ```
 
 ## Output Example
@@ -162,6 +183,21 @@ If validation fails, the script will report errors and NOT upload.
 1. Download service account key from Firebase Console
 2. Save as `scripts/firebase-config.json`
 3. Check the example file: `scripts/firebase-config.json.example`
+
+### "command not found: pip" or "externally-managed-environment"
+
+**Solution**: Use virtual environment (recommended for modern Python):
+```bash
+# Create and activate virtual environment
+python3 -m venv venv
+source venv/bin/activate
+
+# Install dependencies
+pip install -r scripts/requirements.txt
+
+# Run scripts normally
+python scripts/upload_templates.py --list
+```
 
 ### "Error initializing Firebase"
 

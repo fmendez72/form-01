@@ -1,189 +1,297 @@
-## Initial Prompt
+# Implementation Prompt: Dual-View Form Renderer
 
-I'm building a new web application for systematic political science data collection. This is a complete redesign of an existing system (v2.2) to address flexibility and usability limitations.
+## Context
 
-**Context**: I have a detailed `Requirements.md` file in this repository that specifies all functional and technical requirements. Please read it carefully before we start planning.
+You are working on a political data collection web app (form-01). The app currently uses Handsontable for form rendering, which works but provides a spreadsheet-like experience that isn't optimal for forms with 20-30+ fields. 
 
-**Project Type**: Serverless single-page application (SPA) using Firebase Authentication + Firestore Database, deployed to GitHub Pages. NO BUILD TOOLS - pure CDN-based dependencies and ES6 modules.
+The goal is to add a traditional Bootstrap form renderer alongside the existing Handsontable renderer, allowing users to toggle between "Form View" (new) and "Table View" (existing).
 
-**Core Requirements Summary**:
-1. **Landing Page**: Quarto-generated (I'll handle this separately). The Firebase app should have clear entry points for Sign-In (coders) and Admin Panel.
+## Background Information
 
-2. **Flexible Template System**: Support multiple field types (text, textarea, dropdown, radio, checkbox, number, date) defined via CSV or JSON schema. Current system is limited to 6 fixed columns.
+**Read these files first (in order):**
 
-3. **Form Rendering**: Dynamic form renderer that adapts to template schema. Consider whether to use table layout (Handsontable), custom form, or hybrid approach.
+1. `CLAUDE.md` - Complete project context, architecture, and technical specification for the new renderer
+2. `js/form-renderer.js` - Existing Handsontable renderer (reference for API contract and conditional logic)
+3. `docs/csv-structure.md` - Template field specification (field types, options, skip logic, groups)
+4. `signin.html` - Where form rendering is invoked (see the `<script type="module">` section)
+5. `css/styles.css` - Existing styles to maintain consistency
 
-4. **Improved Admin UX**:
-   - Better response viewer (replace JSON alert with proper table)
-   - CSV export functionality
-   - Filtering and search
+## What Needs to Be Done
 
-5. **Enhanced User Experience**:
-   - Clear help text/tooltips (not hidden)
-   - Progress indicators
-   - Auto-save drafts
-   - Mobile-responsive design
+### Phase 1: Create the Standard Form Renderer
 
-**Your Task**:
+Create `js/form-renderer-standard.js` that:
 
-1. **READ** the `Requirements.md` file completely
-2. **ENTER PLAN MODE** to thoroughly explore implementation options
-3. **CONSIDER ALTERNATIVES** for:
-   - Form rendering approach (custom vs library vs hybrid)
-   - Template format (improved CSV vs JSON schema vs form builder)
-   - UI component choices (which libraries via CDN)
-4. **ASK CLARIFYING QUESTIONS** about requirements, trade-offs, and design decisions
-5. **PROPOSE A DETAILED PLAN** with:
-   - Recommended architecture
-   - Technology choices (specific libraries/frameworks via CDN)
-   - File structure
-   - Data model (Firestore collections)
-   - Implementation phases (MVP → Phase 2 → Phase 3)
-   - Migration strategy from v2.2 (if needed)
+1. **Exports the same API** as `form-renderer.js`:
+   ```javascript
+   export function initializeForm(containerId, template, responseData, options = {});
+   export function extractResponseData(fields);
+   export function validateForm(fields);
+   export function syncAllInputs();
+   export function destroyForm();
+   export function getHotInstance(); // return null
+   ```
 
-**Important Constraints**:
-- NO build tools (Webpack, Vite, npm, Node.js)
-- ALL dependencies via CDN
-- Must use Firebase v9 Modular SDK (Auth + Firestore)
-- Must deploy to GitHub Pages (static hosting)
-- Modern browsers only (ES6+ support)
+2. **Renders fields as Bootstrap 5 form components**:
+   - text → `<input type="text" class="form-control">`
+   - textarea → `<textarea class="form-control" rows="3">`
+   - number → `<input type="number" class="form-control">` with min/max attributes
+   - date → text input + calendar picker button (like existing renderer)
+   - dropdown → `<select class="form-select">` with options
+   - radio → horizontal radio group with `form-check-inline`
 
-**What I Need from You**:
-- A well-researched, opinionated plan
-- Specific library recommendations (with CDN links)
-- Clear rationale for design decisions
-- Trade-off analysis for key choices
-- Phased implementation approach
+3. **Groups fields into Bootstrap Accordion sections**:
+   - Fields with same `group` value go under one accordion item
+   - Accordion items show completion indicator badge (e.g., "3/5 complete")
+   - Fields without a group appear outside accordion (at top or bottom)
 
-**What I'll Provide**:
-- Feedback on your plan
-- Decisions on open questions
-- Approval to proceed with implementation
+4. **Implements conditional logic (skip)**:
+   - Reuse the `updateHiddenFields()` logic pattern from existing renderer
+   - Hidden fields get `d-none` Bootstrap class
+   - Re-evaluate on every field change
 
-Let's start by you reading the Requirements.md file and then entering plan mode to explore the design space thoroughly.
+5. **Handles notes fields**:
+   - Each field has an optional notes input below it
+   - Notes stored as `fieldId_note` in response data
 
----
+6. **Supports read-only mode**:
+   - When `options.readOnly = true`, disable all inputs
 
-## Follow-Up Questions You Might Ask
+7. **Calls `onDataChange` callback**:
+   - When `options.onDataChange` provided, call it after field changes
 
-Feel free to ask me questions like:
+### Phase 2: Integrate View Toggle in signin.html
 
-**Template Management**:
-- Do you prefer CSV format (easier for non-technical users) or JSON schema (more flexible)?
-- Should we support a visual form builder in the future, or is CSV/JSON sufficient?
-- How important is template versioning (v1, v2, v3 with migration)?
+1. **Add view toggle buttons** above the form:
+   ```html
+   <div class="btn-group btn-group-sm mb-3" role="group">
+     <button type="button" class="btn btn-outline-primary active" id="formViewBtn">📝 Form View</button>
+     <button type="button" class="btn btn-outline-primary" id="tableViewBtn">📊 Table View</button>
+   </div>
+   ```
 
-**Form Rendering**:
-- Do you want table layout (good for comparative data entry) or traditional form layout (better for long questionnaires)?
-- Should we use a library like Survey.js (feature-rich but larger) or build custom (lighter but more work)?
-- How complex should conditional logic be (simple show/hide or complex branching)?
+2. **Import both renderers**:
+   ```javascript
+   import * as standardRenderer from './js/form-renderer-standard.js';
+   import * as tableRenderer from './js/form-renderer.js';
+   ```
 
-**UI/UX Priorities**:
-- Is mobile responsiveness critical for MVP or nice-to-have?
-- Should help text be always visible (side panel) or on-demand (tooltips)?
-- Do you prefer minimalist design or feature-rich interface?
+3. **Implement toggle logic**:
+   - Track current view in state variable
+   - On toggle: extract current data, destroy current form, initialize with other renderer
+   - Persist preference in `localStorage`
+   - Default to "Form View"
 
-**Data Export**:
-- What CSV export format do you need? Flat (one row per response) or nested (one row per field)?
-- Should we support Excel export (.xlsx) or just CSV?
-- Do you need filtering/aggregation before export?
+4. **Update existing function calls** to use the active renderer
 
-**Migration from v2.2**:
-- Do we need to migrate existing Firestore data from v2.2, or start fresh?
-- Can we keep the same Firebase project or should I create a new one?
-- Should v2.2 and v3.0 coexist, or is this a hard cutover?
+### Phase 3: Add CSS Styles
 
----
+Add to `css/styles.css`:
 
-## Expected Plan Output
+```css
+/* Standard Form Renderer */
+.form-field {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border-color);
+}
 
-Your plan should include sections like:
+.form-field:last-child {
+  border-bottom: none;
+}
 
-### 1. Architecture Overview
-- Technology stack (specific versions, CDN links)
-- Firestore data model (collections, document structure)
-- File structure (HTML, JS, CSS organization)
-- Authentication & authorization flow
+/* Completion badges in accordion headers */
+.accordion-button .completion-badge {
+  font-weight: normal;
+  font-size: 0.75em;
+  margin-left: auto;
+  margin-right: 8px;
+}
 
-### 2. Form Rendering Strategy
-- Recommended approach (custom/library/hybrid)
-- Pros/cons analysis
-- Example implementation sketch
+.completion-badge.complete {
+  background-color: var(--success-color);
+}
 
-### 3. Template Management
-- CSV format specification (improved from v2.2)
-- Parsing and validation logic
-- Template creation workflow
+/* Notes section styling */
+.field-notes {
+  margin-top: 8px;
+}
 
-### 4. Admin Panel Design
-- Response viewer UI mockup (conceptual)
-- Export functionality approach
-- User management workflow
+.field-notes .form-label {
+  font-size: 0.85em;
+  color: var(--secondary-color);
+}
 
-### 5. Implementation Phases
-- **Phase 1 (MVP)**: Core features for basic functionality
-- **Phase 2**: Enhanced UX and admin features
-- **Phase 3**: Advanced features (conditional logic, validation)
+/* View toggle */
+.view-toggle {
+  margin-bottom: 16px;
+}
 
-### 6. Open Questions & Decisions Needed
-- List of questions you need me to answer
-- Trade-offs that require my input
+/* Help icon improvements */
+.help-icon {
+  cursor: help;
+}
+```
 
-### 7. Migration Plan (if applicable)
-- How to transition from v2.2 to v3.0
-- Data migration scripts
-- Coexistence strategy
+## Implementation Notes
 
----
+### Conditional Logic Pattern
 
-## Additional Context Files
+Copy this from `form-renderer.js` and adapt:
 
-If helpful, you can reference these files from the v2.2 codebase (in parent directory):
-- `CLAUDE.md` - Detailed context about v2.2 architecture, pain points, and lessons learned
-- `app.js` - Current implementation of form rendering (Handsontable)
-- `scripts/admin.js` - Current CSV parsing and admin logic
-- `firebase-config.js` - Firebase initialization pattern
+```javascript
+let hiddenFieldIds = new Set();
 
-But don't be constrained by v2.2 - this is a fresh start. Feel free to propose completely different approaches if they better meet the requirements.
+function updateHiddenFields(fields, responseData) {
+  hiddenFieldIds.clear();
+  const fieldMap = new Map(fields.map(f => [f.id, f]));
 
----
+  for (const field of fields) {
+    if (field.skipIf && field.skipToFieldId) {
+      const currentValue = responseData[field.id] || '';
+      if (currentValue === field.skipIf) {
+        const currentIndex = fields.findIndex(f => f.id === field.id);
+        const targetIndex = fields.findIndex(f => f.id === field.skipToFieldId);
+        if (targetIndex > currentIndex) {
+          for (let i = currentIndex + 1; i < targetIndex; i++) {
+            hiddenFieldIds.add(fields[i].id);
+          }
+        }
+      }
+    }
+  }
+}
+```
 
-## My Development Approach
+### Field Rendering Example
 
-I prefer:
-- **Phased implementation**: Start with MVP, iterate based on feedback
-- **Simplicity over features**: Clean, maintainable code > kitchen-sink functionality
-- **User-centric design**: Usability for non-technical admins is critical
-- **Flexibility**: System should adapt to diverse questionnaire types
-- **Documentation**: Keep CLAUDE.md updated, clear README for users
+```javascript
+function renderTextField(field, value, isReadOnly) {
+  const div = document.createElement('div');
+  div.className = 'mb-3 form-field';
+  div.dataset.fieldId = field.id;
+  
+  const label = document.createElement('label');
+  label.className = 'form-label';
+  label.htmlFor = `field-${field.id}`;
+  label.textContent = field.label;
+  
+  if (field.required) {
+    const asterisk = document.createElement('span');
+    asterisk.className = 'text-danger';
+    asterisk.textContent = ' *';
+    label.appendChild(asterisk);
+  }
+  
+  if (field.help) {
+    const helpIcon = document.createElement('span');
+    helpIcon.className = 'help-icon ms-1';
+    helpIcon.textContent = 'ⓘ';
+    helpIcon.title = field.help;
+    label.appendChild(helpIcon);
+  }
+  
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'form-control';
+  input.id = `field-${field.id}`;
+  input.value = value || '';
+  input.disabled = isReadOnly;
+  
+  input.oninput = () => {
+    formData[field.id] = input.value;
+    onFieldChange();
+  };
+  
+  div.appendChild(label);
+  div.appendChild(input);
+  
+  // Add notes field
+  div.appendChild(renderNotesField(field.id, formData[`${field.id}_note`], isReadOnly));
+  
+  return div;
+}
+```
 
-I value:
-- Clear explanations of design decisions
-- Trade-off analysis (what we gain/lose with each choice)
-- Specific, actionable recommendations
-- Working code over perfect code (iterate and improve)
+### Accordion Structure
 
----
+```javascript
+function renderAccordion(groups, fields, responseData, isReadOnly) {
+  const accordion = document.createElement('div');
+  accordion.className = 'accordion';
+  accordion.id = 'formAccordion';
+  
+  groups.forEach((groupName, index) => {
+    const groupFields = fields.filter(f => f.group === groupName);
+    const completion = getGroupCompletion(groupName, groupFields, responseData);
+    
+    const item = document.createElement('div');
+    item.className = 'accordion-item';
+    
+    item.innerHTML = `
+      <h2 class="accordion-header">
+        <button class="accordion-button ${index > 0 ? 'collapsed' : ''}" 
+                type="button" 
+                data-bs-toggle="collapse" 
+                data-bs-target="#group-${index}">
+          ${groupName}
+          <span class="completion-badge badge ${completion.complete ? 'bg-success' : 'bg-secondary'}">
+            ${completion.filled}/${completion.total}
+          </span>
+        </button>
+      </h2>
+      <div id="group-${index}" class="accordion-collapse collapse ${index === 0 ? 'show' : ''}">
+        <div class="accordion-body"></div>
+      </div>
+    `;
+    
+    const body = item.querySelector('.accordion-body');
+    groupFields.forEach(field => {
+      body.appendChild(renderField(field, responseData[field.id], isReadOnly));
+    });
+    
+    accordion.appendChild(item);
+  });
+  
+  return accordion;
+}
+```
+
+## Testing
+
+After implementation, test with these scenarios:
+
+1. **Basic rendering**: Load `simple-survey.csv` template, verify all field types render
+2. **Conditional logic**: Load `conditional-form.csv`, test skip behavior
+3. **Groups**: Load `grouped-likert.csv`, verify accordion sections
+4. **Data persistence**: Fill form, save, reload, verify data restored
+5. **View toggle**: Switch between Form/Table view, verify data preserved
+6. **Validation**: Try to submit with missing required fields
+7. **Read-only mode**: View a submitted response, verify fields disabled
 
 ## Success Criteria
 
-Your plan is successful if:
-- ✅ I understand the proposed architecture clearly
-- ✅ Technology choices are justified with pros/cons
-- ✅ Implementation is feasible without build tools
-- ✅ Design addresses v2.2 pain points (flexibility, UX, admin tools)
-- ✅ Plan is phased with clear MVP scope
-- ✅ I can make informed decisions on open questions
+- [ ] New form renderer works with all existing templates
+- [ ] Data format identical between renderers (extractResponseData output matches)
+- [ ] Conditional logic works correctly
+- [ ] View toggle preserves all entered data
+- [ ] Auto-save continues to work
+- [ ] Submit workflow unchanged
+- [ ] No changes needed to Firestore data model
+- [ ] No changes needed to admin panel
 
----
+## Files to Create/Modify
 
-## Let's Begin!
+| File | Action |
+|------|--------|
+| `js/form-renderer-standard.js` | CREATE - new Bootstrap form renderer |
+| `signin.html` | MODIFY - add view toggle, import both renderers |
+| `css/styles.css` | MODIFY - add styles for new form components |
+| `CLAUDE.md` | MODIFY - update implementation status checkboxes |
 
-Please start by:
-1. Reading `Requirements.md` in this repository
-2. Entering plan mode
-3. Exploring implementation options with research/analysis
-4. Asking me clarifying questions
-5. Proposing a detailed, well-researched plan
+## Do NOT Change
 
-I'm ready for your questions and excited to see your recommendations!
+- `js/form-renderer.js` - keep existing Handsontable renderer as-is
+- `js/firestore-service.js` - data model unchanged
+- `admin.html` - admin panel unchanged
+- Template CSV format - no changes
+- Firestore collections/documents - no changes

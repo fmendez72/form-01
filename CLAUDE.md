@@ -22,6 +22,30 @@ The application is functional with the following features working:
 - ✅ Collapsible group sections
 - ✅ Min/max validation for number fields
 
+## Active Development: Dual-View Form Renderer
+
+**Goal:** Add a traditional vertical form renderer alongside the existing Handsontable grid view to improve UX for long forms (20-30+ fields).
+
+### Design Decision
+- **Form View**: New default for data entry - vertical Bootstrap form with collapsible accordion sections
+- **Table View**: Existing Handsontable renderer - available as optional "review mode" for power users
+- **View Toggle**: Users can switch between views; data model is shared
+
+### Implementation Status
+- [x] Phase 1: New form renderer (`js/form-renderer-standard.js`)
+- [x] Phase 2: View toggle integration in `signin.html`
+- [ ] Phase 3: Enhanced section navigation
+- [ ] Phase 4: Polish and UX improvements
+
+### Key Files for This Feature
+| File | Role |
+|------|------|
+| `js/form-renderer.js` | **Existing** Handsontable renderer (keep as-is, rename to `form-renderer-table.js`) |
+| `js/form-renderer-standard.js` | **New** Bootstrap form renderer (to be created) |
+| `signin.html` | Update to support view toggle |
+| `css/styles.css` | Add styles for new form components |
+| `docs/csv-structure.md` | Reference for field types and conditional logic |
+
 ## Architecture
 
 ### Technology Stack
@@ -363,14 +387,15 @@ form-01/
 - [x] **Min/max validation**: Number field constraints
 
 ### Planned Features
+- [ ] **Template versioning system**: Use versioned job IDs (`simple-survey-v1`, `simple-survey-v2`) to prevent orphaned responses when templates change
+- [ ] **Response migration**: Auto-update old responses to new template schemas
 - [ ] **Advanced validation**: Regex patterns, custom validators
 - [ ] **Complex skip logic**: Multiple conditions, AND/OR logic
 - [ ] **Skip backwards**: Currently only forward jumps supported
 - [ ] **Field dependencies**: Show/hide based on multiple field values
-- [ ] Template versioning with migration
-- [ ] Response editing by admin
-- [ ] Email notifications
-- [ ] Form builder UI (visual CSV editor)
+- [ ] **Response editing by admin**: Allow admins to edit submitted responses
+- [ ] **Email notifications**: Notify users of assignments, reminders
+- [ ] **Form builder UI**: Visual CSV editor for creating templates
 
 ## Development Notes
 
@@ -379,13 +404,18 @@ form-01/
 For testing and debugging, use the Python script to upload templates directly to Firestore:
 
 ```bash
-# One-time setup
+# One-time setup - Create virtual environment
+python3 -m venv venv
+source venv/bin/activate
 pip install -r scripts/requirements.txt
 
 # Get Firebase service account key (one time)
 # 1. Firebase Console > Project Settings > Service Accounts
 # 2. Generate New Private Key
 # 3. Save as scripts/firebase-config.json
+
+# Always activate virtual environment first
+source venv/bin/activate
 
 # Upload all templates
 python scripts/upload_templates.py
@@ -398,6 +428,9 @@ python scripts/upload_templates.py --clear
 
 # Validate without uploading
 python scripts/upload_templates.py --dry-run
+
+# When done, deactivate
+deactivate
 ```
 
 **Benefits:**
@@ -405,7 +438,13 @@ python scripts/upload_templates.py --dry-run
 - ✅ Validates CSV structure before upload
 - 🔄 Easy to iterate during development
 - 🔒 Uses service account (no manual auth needed)
-- 📝 See [scripts/README.md](scripts/README.md) for full documentation
+- 🐍 Virtual environment keeps dependencies isolated (~20MB)
+- 📝 See [scripts/README.md](scripts/README.md) and [scripts/SETUP.md](scripts/SETUP.md) for full documentation
+
+**Setup Requirements:**
+- Python 3.7+ (you have Python 3.13.5 ✓)
+- Virtual environment (recommended for modern Python)
+- Firebase service account key
 
 ### Deploying Firestore Rules
 ```bash
@@ -447,3 +486,206 @@ firebase deploy --only firestore:rules
 Project Owner: Fernando Mendez
 Repository: https://github.com/fmendez72/form-01
 Firebase Project: data-collector-2025
+
+---
+
+## Technical Specification: Standard Form Renderer
+
+### Overview
+
+Create `js/form-renderer-standard.js` - a new form renderer using Bootstrap 5 form components instead of Handsontable grid. This provides a traditional vertical form layout better suited for guided data entry.
+
+### API Contract (Must Match Existing)
+
+The new renderer must export the same functions as `form-renderer.js`:
+
+```javascript
+// Required exports (same signature as existing)
+export function initializeForm(containerId, template, responseData, options = {});
+export function extractResponseData(fields);
+export function validateForm(fields);
+export function syncAllInputs();
+export function destroyForm();
+export function getHotInstance(); // Can return null for this renderer
+```
+
+### Data Flow (Unchanged)
+
+1. `signin.html` calls `initializeForm()` with template and response data
+2. Renderer displays fields, user makes edits
+3. On blur/change, data syncs internally (auto-save calls `extractResponseData()`)
+4. On save/submit, `syncAllInputs()` called, then `extractResponseData()` returns `{ fieldId: value, fieldId_note: value }`
+5. `validateForm()` returns `{ valid: boolean, errors: [] }`
+
+### Field Type Rendering
+
+| CSV field_type | HTML Element | Bootstrap Classes |
+|----------------|--------------|-------------------|
+| text | `<input type="text">` | `form-control` |
+| textarea | `<textarea>` | `form-control`, rows=3 |
+| number | `<input type="number">` | `form-control` |
+| date | `<input type="text">` + calendar button | `form-control` + button |
+| dropdown | `<select>` | `form-select` |
+| radio | `<input type="radio">` group | `form-check`, `form-check-input`, `form-check-inline` |
+
+### Section/Group Rendering
+
+Use Bootstrap 5 Accordion for collapsible groups:
+
+```html
+<div class="accordion" id="formAccordion">
+  <div class="accordion-item">
+    <h2 class="accordion-header">
+      <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#group-basic-info">
+        Basic Information
+        <span class="badge bg-secondary ms-2">3/5 complete</span>  <!-- completion indicator -->
+      </button>
+    </h2>
+    <div id="group-basic-info" class="accordion-collapse collapse show">
+      <div class="accordion-body">
+        <!-- fields here -->
+      </div>
+    </div>
+  </div>
+</div>
+```
+
+### Conditional Logic (Skip)
+
+Reuse the same logic from existing renderer:
+
+1. Maintain `hiddenFieldIds` Set
+2. On any field change, call `updateHiddenFields(fields, currentData)`
+3. Hidden fields get `d-none` class (Bootstrap utility)
+4. Hidden fields excluded from validation
+
+### Field Layout Structure
+
+```html
+<div class="mb-3 form-field" data-field-id="country_name">
+  <label class="form-label">
+    Country Name
+    <span class="text-danger">*</span>  <!-- if required -->
+    <span class="help-icon ms-1" title="Help text here">ⓘ</span>  <!-- if help_text -->
+  </label>
+  <input type="text" class="form-control" id="field-country_name">
+  <div class="invalid-feedback">This field is required</div>
+  
+  <!-- Notes field (collapsible or always visible) -->
+  <div class="mt-2">
+    <label class="form-label small text-muted">Notes</label>
+    <input type="text" class="form-control form-control-sm" id="field-country_name_note" placeholder="Optional notes">
+  </div>
+</div>
+```
+
+### State Management
+
+Store current values in a simple object (no need for Handsontable's complex data model):
+
+```javascript
+let formData = {};  // { fieldId: value, fieldId_note: value }
+let hiddenFieldIds = new Set();
+let formContainer = null;
+let currentFields = [];
+```
+
+### Event Handling
+
+- Use `oninput` for text/textarea/number (immediate sync)
+- Use `onchange` for select/radio (on selection)
+- Debounce is handled by caller (auto-save in signin.html)
+
+### Validation Display
+
+Use Bootstrap's validation classes:
+- Invalid: add `is-invalid` class to input, show `.invalid-feedback`
+- Valid: add `is-valid` class (optional, for visual feedback)
+
+### CSS Additions Needed
+
+Add to `css/styles.css`:
+
+```css
+/* Standard Form Renderer */
+.form-field {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.form-field:last-child {
+  border-bottom: none;
+}
+
+.form-field.is-hidden {
+  display: none;
+}
+
+/* Section completion badges */
+.accordion-button .badge {
+  font-weight: normal;
+  font-size: 0.75em;
+}
+
+.section-complete {
+  color: var(--success-color);
+}
+
+.section-incomplete {
+  color: var(--secondary-color);
+}
+
+/* Notes toggle */
+.notes-toggle {
+  font-size: 0.85em;
+  color: var(--secondary-color);
+  cursor: pointer;
+}
+
+.notes-toggle:hover {
+  color: var(--primary-color);
+}
+```
+
+### View Toggle Integration
+
+In `signin.html`, add view toggle buttons:
+
+```html
+<div class="btn-group btn-group-sm mb-3" role="group">
+  <button type="button" class="btn btn-outline-primary active" id="formViewBtn">
+    📝 Form View
+  </button>
+  <button type="button" class="btn btn-outline-primary" id="tableViewBtn">
+    📊 Table View
+  </button>
+</div>
+```
+
+Toggle logic:
+1. Store current view preference in `localStorage`
+2. On toggle, call `destroyForm()` then re-initialize with other renderer
+3. Pass same `responseData` (extracted before destroy) to new renderer
+
+### File Renaming Plan
+
+1. Rename `js/form-renderer.js` → `js/form-renderer-table.js`
+2. Create `js/form-renderer-standard.js` (new)
+3. Create `js/form-renderer.js` as facade that delegates to active renderer
+
+Or simpler: keep both renderers separate, import both in signin.html, toggle between them.
+
+### Testing Checklist
+
+- [ ] All 6 field types render correctly
+- [ ] Required field indicators show
+- [ ] Help text displays (tooltip or inline)
+- [ ] Conditional logic hides/shows fields
+- [ ] Accordion sections expand/collapse
+- [ ] Completion indicators update on field change
+- [ ] extractResponseData() returns same format as Handsontable renderer
+- [ ] validateForm() catches missing required fields
+- [ ] Notes fields capture data correctly
+- [ ] View toggle preserves data when switching
+- [ ] Auto-save works with new renderer
+- [ ] Submit workflow completes successfully
