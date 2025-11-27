@@ -22,29 +22,57 @@ The application is functional with the following features working:
 - ✅ Collapsible group sections
 - ✅ Min/max validation for number fields
 
-## Active Development: Dual-View Form Renderer
+## Active Development: Form View with Review Modal
 
-**Goal:** Add a traditional vertical form renderer alongside the existing Handsontable grid view to improve UX for long forms (20-30+ fields).
+**Goal:** Provide optimal UX for data entry with traditional vertical form, plus compact table review before submission.
 
 ### Design Decision
-- **Form View**: New default for data entry - vertical Bootstrap form with collapsible accordion sections
-- **Table View**: Existing Handsontable renderer - available as optional "review mode" for power users
-- **View Toggle**: Users can switch between views; data model is shared
+- **Form View**: Primary data entry interface - vertical Bootstrap form with collapsible accordion sections
+- **Review Modal**: Editable Handsontable in modal for final review before submission
+- **Workflow**: Enter data in form → Review in table → Submit
 
 ### Implementation Status
 - [x] Phase 1: New form renderer (`js/form-renderer-standard.js`)
-- [x] Phase 2: View toggle integration in `signin.html`
-- [ ] Phase 3: Enhanced section navigation
-- [ ] Phase 4: Polish and UX improvements
+- [x] Phase 2: Review modal with editable Handsontable
+- [x] Phase 3: Simplified workflow (removed view toggle)
+- [ ] Phase 4: Enhanced features (download/email submitted forms)
 
 ### Key Files for This Feature
 | File | Role |
 |------|------|
-| `js/form-renderer.js` | **Existing** Handsontable renderer (keep as-is, rename to `form-renderer-table.js`) |
-| `js/form-renderer-standard.js` | **New** Bootstrap form renderer (to be created) |
-| `signin.html` | Update to support view toggle |
-| `css/styles.css` | Add styles for new form components |
+| `js/form-renderer.js` | **Existing** Handsontable renderer - used in review modal |
+| `js/form-renderer-standard.js` | **New** Bootstrap form renderer - primary data entry |
+| `signin.html` | Form interface with review modal |
+| `css/styles.css` | Styles for form components |
 | `docs/csv-structure.md` | Reference for field types and conditional logic |
+
+### New Workflow
+
+**Data Entry → Review → Submit**
+
+1. **Form View** (Default)
+   - Vertical Bootstrap form with accordion sections
+   - Auto-save every 30 seconds
+   - Manual save with "💾 Save Draft" button
+   - Progress indicator shows completion
+
+2. **Review Modal** (Optional)
+   - Click "📋 Review Answers" to open modal
+   - Editable Handsontable shows all responses in compact table
+   - Make quick edits if needed
+   - Changes auto-save when closing modal or clicking "Save Changes"
+   - Useful for final review of long forms
+
+3. **Submit**
+   - Click "✓ Submit Response" to finalize
+   - Validates required fields
+   - Irreversible once submitted
+   - Submitted forms become read-only
+
+**Button Layout:**
+```
+[💾 Save Draft]    [📋 Review Answers]    [✓ Submit Response]
+```
 
 ## Architecture
 

@@ -92,33 +92,46 @@
         </div>
       </div>
 
-      <!-- View Toggle -->
-      <div class="view-toggle mb-3">
-        <div class="btn-group btn-group-sm" role="group" aria-label="View toggle">
-          <button type="button" class="btn btn-outline-primary active" id="formViewBtn">
-            📝 Form View
-          </button>
-          <button type="button" class="btn btn-outline-primary" id="tableViewBtn">
-            📊 Table View
-          </button>
-        </div>
-      </div>
-
       <div class="card">
         <div class="card-body p-0">
           <div id="formContainer"></div>
         </div>
       </div>
 
-      <div class="d-flex justify-content-between mt-3">
+      <div class="d-flex justify-content-center gap-3 mt-3">
         <button id="saveDraftBtn" class="btn btn-outline-primary">
           💾 Save Draft
         </button>
-        <div>
-          <span id="lastSaved" class="text-muted small me-3"></span>
-          <button id="submitBtn" class="btn btn-success">
-            ✓ Submit Response
-          </button>
+        <button id="reviewBtn" class="btn btn-outline-secondary">
+          📋 Review Answers
+        </button>
+        <button id="submitBtn" class="btn btn-success">
+          ✓ Submit Response
+        </button>
+      </div>
+      <div class="text-center mt-2">
+        <span id="lastSaved" class="text-muted small"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Review Modal -->
+  <div class="modal fade" id="reviewModal" tabindex="-1" aria-labelledby="reviewModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="reviewModalLabel">📋 Review Your Answers</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="alert alert-info">
+            <strong>Review Mode:</strong> You can edit your answers directly in this table. Changes are saved when you click "Save Changes" or close the modal.
+          </div>
+          <div id="reviewTableContainer" style="overflow-x: auto;"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          <button type="button" class="btn btn-primary" id="saveReviewBtn">💾 Save Changes</button>
         </div>
       </div>
     </div>
@@ -143,8 +156,8 @@
     let currentTemplate = null;
     let currentResponse = null;
     let autoSaveTimer = null;
-    let currentRenderer = null; // Track which renderer is active
-    let currentView = localStorage.getItem('formViewPreference') || 'form'; // 'form' or 'table'
+    let reviewTableInstance = null; // Handsontable instance for review modal
+    let reviewModal = null; // Bootstrap modal instance
 
     // DOM Elements
     const signInSection = document.getElementById('signInSection');
@@ -211,24 +224,14 @@
       }
     });
 
+    // Initialize review modal
+    reviewModal = new bootstrap.Modal(document.getElementById('reviewModal'));
+
     // Back to dashboard
     document.getElementById('backToDashboard').addEventListener('click', () => {
-      destroyCurrentForm();
+      standardRenderer.destroyForm();
       clearAutoSave();
       showDashboard();
-    });
-
-    // View toggle handlers
-    document.getElementById('formViewBtn').addEventListener('click', () => {
-      if (currentView !== 'form') {
-        switchView('form');
-      }
-    });
-
-    document.getElementById('tableViewBtn').addEventListener('click', () => {
-      if (currentView !== 'table') {
-        switchView('table');
-      }
     });
 
     // Save draft
@@ -236,15 +239,30 @@
       await saveDraft();
     });
 
+    // Review answers
+    document.getElementById('reviewBtn').addEventListener('click', () => {
+      openReviewModal();
+    });
+
+    // Save changes from review modal
+    document.getElementById('saveReviewBtn').addEventListener('click', async () => {
+      await saveReviewChanges();
+    });
+
+    // Handle modal close - save changes automatically
+    document.getElementById('reviewModal').addEventListener('hidden.bs.modal', async () => {
+      await saveReviewChanges();
+    });
+
     // Submit response
     document.getElementById('submitBtn').addEventListener('click', async () => {
       // First sync all inputs to capture any unsaved edits
-      currentRenderer.syncAllInputs();
+      standardRenderer.syncAllInputs();
 
       // Small delay to ensure sync is complete
       await new Promise(resolve => setTimeout(resolve, 100));
 
-      const validation = currentRenderer.validateForm(currentTemplate.fields);
+      const validation = standardRenderer.validateForm(currentTemplate.fields);
       if (!validation.valid) {
         const errorMessages = validation.errors.map(e => `Row ${e.row}: ${e.label}`).join('\n');
         alert(`Please complete required fields:\n${errorMessages}`);
@@ -259,7 +277,7 @@
       await saveDraft();
       await submitResponse(currentResponse.responseId);
       alert('Response submitted successfully!');
-      destroyCurrentForm();
+      standardRenderer.destroyForm();
       clearAutoSave();
       showDashboard();
     });
@@ -343,59 +361,54 @@
       }
     }
 
-    // Get active renderer based on current view
-    function getActiveRenderer() {
-      return currentView === 'form' ? standardRenderer : tableRenderer;
-    }
-
-    // Update view toggle buttons
-    function updateViewToggleButtons() {
-      const formBtn = document.getElementById('formViewBtn');
-      const tableBtn = document.getElementById('tableViewBtn');
-
-      if (currentView === 'form') {
-        formBtn.classList.add('active');
-        tableBtn.classList.remove('active');
-      } else {
-        formBtn.classList.remove('active');
-        tableBtn.classList.add('active');
-      }
-    }
-
-    // Switch between form and table view
-    function switchView(newView) {
+    // Open review modal with Handsontable
+    function openReviewModal() {
       if (!currentTemplate || !currentResponse) return;
 
-      // Extract current data before destroying
-      const currentData = currentRenderer.extractResponseData(currentTemplate.fields);
+      // Sync current form data
+      standardRenderer.syncAllInputs();
+      const currentData = standardRenderer.extractResponseData(currentTemplate.fields);
 
-      // Destroy current form
-      destroyCurrentForm();
+      // Destroy existing review table if any
+      if (reviewTableInstance) {
+        reviewTableInstance.destroy();
+        reviewTableInstance = null;
+      }
 
-      // Update view preference
-      currentView = newView;
-      localStorage.setItem('formViewPreference', newView);
-
-      // Update toggle buttons
-      updateViewToggleButtons();
-
-      // Re-initialize with new renderer
-      currentRenderer = getActiveRenderer();
+      // Initialize Handsontable with current data
       const isReadOnly = currentResponse.status === 'submitted';
-
-      currentRenderer.initializeForm('formContainer', currentTemplate, currentData, {
+      reviewTableInstance = tableRenderer.initializeForm('reviewTableContainer', currentTemplate, currentData, {
         readOnly: isReadOnly,
+        onDataChange: null // No auto-save in review mode
+      });
+
+      // Show modal
+      reviewModal.show();
+    }
+
+    // Save changes from review modal back to main form
+    async function saveReviewChanges() {
+      if (!reviewTableInstance || !currentTemplate) return;
+
+      // Extract data from review table
+      tableRenderer.syncAllInputs();
+      const reviewData = tableRenderer.extractResponseData(currentTemplate.fields);
+
+      // Update main form with review data
+      standardRenderer.destroyForm();
+      standardRenderer.initializeForm('formContainer', currentTemplate, reviewData, {
+        readOnly: currentResponse.status === 'submitted',
         onDataChange: () => updateProgress()
       });
 
-      updateProgress();
-    }
+      // Save to Firestore
+      await updateResponseData(currentResponse.responseId, reviewData);
 
-    // Destroy current form (using active renderer)
-    function destroyCurrentForm() {
-      if (currentRenderer) {
-        currentRenderer.destroyForm();
-      }
+      // Update progress
+      updateProgress();
+
+      const now = new Date();
+      document.getElementById('lastSaved').textContent = `Last saved: ${now.toLocaleTimeString()}`;
     }
 
     // Load a specific job/form
@@ -424,14 +437,9 @@
         document.getElementById('formDescription').textContent = currentTemplate.description || '';
         updateStatusBadge(currentResponse.status);
 
-        // Update view toggle buttons based on saved preference
-        updateViewToggleButtons();
-
-        // Initialize form with active renderer
-        currentRenderer = getActiveRenderer();
+        // Initialize form with standard renderer (always use form view)
         const isReadOnly = currentResponse.status === 'submitted';
-
-        currentRenderer.initializeForm('formContainer', currentTemplate, currentResponse.data || {}, {
+        standardRenderer.initializeForm('formContainer', currentTemplate, currentResponse.data || {}, {
           readOnly: isReadOnly,
           onDataChange: () => updateProgress()
         });
@@ -445,6 +453,7 @@
 
         // Update buttons
         document.getElementById('saveDraftBtn').disabled = isReadOnly;
+        document.getElementById('reviewBtn').disabled = isReadOnly;
         document.getElementById('submitBtn').disabled = isReadOnly;
 
         showForm();
@@ -476,9 +485,9 @@
 
     // Update progress indicator
     function updateProgress() {
-      if (!currentRenderer) return;
+      if (!currentTemplate) return;
 
-      const data = currentRenderer.extractResponseData(currentTemplate.fields);
+      const data = standardRenderer.extractResponseData(currentTemplate.fields);
       const totalFields = currentTemplate.fields.length;
       const filledFields = currentTemplate.fields.filter(f => {
         const value = data[f.id];
@@ -492,12 +501,12 @@
 
     // Save draft
     async function saveDraft() {
-      if (!currentResponse || currentResponse.status === 'submitted' || !currentRenderer) return;
+      if (!currentResponse || currentResponse.status === 'submitted') return;
 
       // Sync all inputs before extracting data
-      currentRenderer.syncAllInputs();
+      standardRenderer.syncAllInputs();
 
-      const data = currentRenderer.extractResponseData(currentTemplate.fields);
+      const data = standardRenderer.extractResponseData(currentTemplate.fields);
       await updateResponseData(currentResponse.responseId, data);
 
       const now = new Date();
